@@ -1,11 +1,21 @@
-<div align="center">
+# AVANYX Store
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+AVANYX Store is a premium, native Android application marketplace designed with a clean, minimal, and high-performance user interface inspired by modern Material 3 design guidelines.
 
-  <h1>Built with AI Studio</h2>
+This is Phase 1 of the AVANYX Store product ecosystem.
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## Project Structure
+- `app/`: The core Android application developed in modern Kotlin and Jetpack Compose.
+- `web-store/`: Web store showcase (Placeholder for future phases).
+- `developer-console/`: Developer uploading and analytics portal (Placeholder for future phases).
+- `admin-console/`: System administration console (Placeholder for future phases).
+- `backend/`: Scalable backend APIs and secure database layer (Placeholder for future phases).
+- `docs/`: Technical documentation regarding architecture, roadmap, and security.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
-
-</div>
+## Technologies Used
+- **Language:** Kotlin
+- **UI:** Jetpack Compose (Material 3)
+- **Architecture:** Clean Architecture with MVVM
+- **Navigation:** Type-safe Navigation Compose
+- **Build System:** Gradle Kotlin DSL
+- **CI/CD:** GitHub Actions for automated debug APK compilation

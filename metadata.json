@@ -1,0 +1,6 @@
+{
+  "name": "AVANYX STORE",
+  "description": "A premium native Android app marketplace interface designed for modern, high-performance app and game discovery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
