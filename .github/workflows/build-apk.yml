@@ -15,6 +15,34 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Generate Debug Keystore (After JDK is set up)
+        run: |
+          echo "Generating standard self-signed debug keystore..."
+          rm -f "$GITHUB_WORKSPACE/debug.keystore"
+          keytool -genkey -v -keystore "$GITHUB_WORKSPACE/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Copy Keystore to referenced paths
+        run: |
+          # Copy to repository root and app module directories to handle different referenced paths
+          cp "$GITHUB_WORKSPACE/debug.keystore" "$GITHUB_WORKSPACE/app/debug.keystore" || true
+
+      - name: Verify Keystore Exists
+        run: |
+          echo "Verifying debug.keystore exists at $GITHUB_WORKSPACE/debug.keystore"
+          ls -l "$GITHUB_WORKSPACE/debug.keystore"
+
+          echo "Verifying debug.keystore exists at root of workspace"
+          ls -l "./debug.keystore"
+
+          echo "Verifying debug.keystore exists in app module"
+          ls -l "app/debug.keystore"
+
       - name: Detect Environment and Verify Paths
         id: detect
         run: |
@@ -48,12 +76,6 @@ jobs:
             exit 1
           fi
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
       - name: Grant Execute Permission to Gradle Wrapper
         run: |
           ROOT_DIR="${{ steps.detect.outputs.project_root }}"
@@ -67,35 +89,27 @@ jobs:
           rm -rf "$ROOT_DIR/.gradle"
           rm -rf "$APP_DIR/build"
 
-      - name: Generate Debug Keystore
+      - name: Print Resolved signingConfig storeFile Path
         run: |
           ROOT_DIR="${{ steps.detect.outputs.project_root }}"
-          APP_DIR="$ROOT_DIR/${{ steps.detect.outputs.app_module }}"
-          echo "Generating self-signed debug keystore for CI build..."
-          rm -f "$ROOT_DIR/debug.keystore"
-          rm -f "$APP_DIR/debug.keystore"
-          keytool -genkey -v -keystore "$ROOT_DIR/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          # Resilient copy to app directory as well
-          cp "$ROOT_DIR/debug.keystore" "$APP_DIR/debug.keystore"
-
-      - name: Verify Keystore Exists
-        run: |
-          ROOT_DIR="${{ steps.detect.outputs.project_root }}"
-          APP_DIR="$ROOT_DIR/${{ steps.detect.outputs.app_module }}"
-          if [ ! -f "$ROOT_DIR/debug.keystore" ]; then
-            echo "::error::Debug keystore could not be found at $ROOT_DIR/debug.keystore!"
-            exit 1
-          else
-            echo "Success: debug.keystore exists at $ROOT_DIR/debug.keystore."
-            ls -la "$ROOT_DIR/debug.keystore"
-          fi
-          if [ ! -f "$APP_DIR/debug.keystore" ]; then
-            echo "::error::Debug keystore could not be found at $APP_DIR/debug.keystore!"
-            exit 1
-          else
-            echo "Success: debug.keystore exists at $APP_DIR/debug.keystore."
-            ls -la "$APP_DIR/debug.keystore"
-          fi
+          cd "$ROOT_DIR"
+          echo "Injecting a print signing configuration script..."
+          cat << 'EOF' > print-signing-config.gradle
+          projectsEvaluated {
+              rootProject.allprojects { prj ->
+                  if (prj.plugins.hasPlugin('com.android.application')) {
+                      try {
+                          def storeFile = prj.android.signingConfigs.debugConfig.storeFile
+                          println "RESOLVED_SIGNING_STORE_FILE: ${storeFile}"
+                      } catch (Exception e) {
+                          println "No debugConfig signingConfig: ${e.message}"
+                      }
+                  }
+              }
+          }
+          EOF
+          ./gradlew -I print-signing-config.gradle help --no-daemon
+          rm -f print-signing-config.gradle
 
       - name: Build Debug APK with Gradle Wrapper
         run: |
