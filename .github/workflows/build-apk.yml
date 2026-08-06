@@ -67,14 +67,34 @@ jobs:
           rm -rf "$ROOT_DIR/.gradle"
           rm -rf "$APP_DIR/build"
 
-      - name: Generate Debug Keystore if missing
+      - name: Generate Debug Keystore
         run: |
           ROOT_DIR="${{ steps.detect.outputs.project_root }}"
+          APP_DIR="$ROOT_DIR/${{ steps.detect.outputs.app_module }}"
+          echo "Generating self-signed debug keystore for CI build..."
+          rm -f "$ROOT_DIR/debug.keystore"
+          rm -f "$APP_DIR/debug.keystore"
+          keytool -genkey -v -keystore "$ROOT_DIR/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          # Resilient copy to app directory as well
+          cp "$ROOT_DIR/debug.keystore" "$APP_DIR/debug.keystore"
+
+      - name: Verify Keystore Exists
+        run: |
+          ROOT_DIR="${{ steps.detect.outputs.project_root }}"
+          APP_DIR="$ROOT_DIR/${{ steps.detect.outputs.app_module }}"
           if [ ! -f "$ROOT_DIR/debug.keystore" ]; then
-            echo "Generating self-signed debug keystore for CI build..."
-            keytool -genkey -v -keystore "$ROOT_DIR/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            echo "::error::Debug keystore could not be found at $ROOT_DIR/debug.keystore!"
+            exit 1
           else
-            echo "debug.keystore already exists."
+            echo "Success: debug.keystore exists at $ROOT_DIR/debug.keystore."
+            ls -la "$ROOT_DIR/debug.keystore"
+          fi
+          if [ ! -f "$APP_DIR/debug.keystore" ]; then
+            echo "::error::Debug keystore could not be found at $APP_DIR/debug.keystore!"
+            exit 1
+          else
+            echo "Success: debug.keystore exists at $APP_DIR/debug.keystore."
+            ls -la "$APP_DIR/debug.keystore"
           fi
 
       - name: Build Debug APK with Gradle Wrapper
