@@ -1,0 +1,114 @@
+name: Build APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Detect Environment and Verify Paths
+        id: detect
+        run: |
+          echo "Checking repository structure..."
+          # Detect Android project root (find where settings.gradle.kts or settings.gradle is located)
+          if [ -f "settings.gradle.kts" ] || [ -f "settings.gradle" ]; then
+            echo "project_root=." >> $GITHUB_OUTPUT
+            ROOT_DIR="."
+          elif [ -f "android/settings.gradle.kts" ] || [ -f "android/settings.gradle" ]; then
+            echo "project_root=android" >> $GITHUB_OUTPUT
+            ROOT_DIR="android"
+          elif [ -f "android-app/settings.gradle.kts" ] || [ -f "android-app/settings.gradle" ]; then
+            echo "project_root=android-app" >> $GITHUB_OUTPUT
+            ROOT_DIR="android-app"
+          else
+            echo "::error::Android project root could not be detected automatically!"
+            exit 1
+          fi
+
+          # Detect Gradle Wrapper in the root directory found
+          if [ ! -f "$ROOT_DIR/gradlew" ]; then
+            echo "::error::Gradle wrapper gradlew not found in project root $ROOT_DIR!"
+            exit 1
+          fi
+
+          # Detect App Module (prefer app)
+          if [ -d "$ROOT_DIR/app" ] && [ -f "$ROOT_DIR/app/build.gradle.kts" -o -f "$ROOT_DIR/app/build.gradle" ]; then
+            echo "app_module=app" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Application module 'app' could not be found or has no build file!"
+            exit 1
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Grant Execute Permission to Gradle Wrapper
+        run: |
+          ROOT_DIR="${{ steps.detect.outputs.project_root }}"
+          chmod +x "$ROOT_DIR/gradlew"
+
+      - name: Clean safe Gradle and Build Caches
+        run: |
+          ROOT_DIR="${{ steps.detect.outputs.project_root }}"
+          APP_DIR="$ROOT_DIR/${{ steps.detect.outputs.app_module }}"
+          echo "Removing safe-to-recreate Gradle caches and build folders..."
+          rm -rf "$ROOT_DIR/.gradle"
+          rm -rf "$APP_DIR/build"
+
+      - name: Generate Debug Keystore if missing
+        run: |
+          ROOT_DIR="${{ steps.detect.outputs.project_root }}"
+          if [ ! -f "$ROOT_DIR/debug.keystore" ]; then
+            echo "Generating self-signed debug keystore for CI build..."
+            keytool -genkey -v -keystore "$ROOT_DIR/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          else
+            echo "debug.keystore already exists."
+          fi
+
+      - name: Build Debug APK with Gradle Wrapper
+        run: |
+          ROOT_DIR="${{ steps.detect.outputs.project_root }}"
+          cd "$ROOT_DIR"
+          ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Locate and Verify Generated APK
+        id: locate
+        run: |
+          ROOT_DIR="${{ steps.detect.outputs.project_root }}"
+          APP_DIR="$ROOT_DIR/${{ steps.detect.outputs.app_module }}"
+          echo "Searching for generated APKs in $APP_DIR/build/..."
+
+          # Find any .apk file under the build directory
+          APK_PATHS=$(find "$APP_DIR/build" -name "*.apk" -type f)
+
+          if [ -z "$APK_PATHS" ]; then
+            echo "::error::No generated APK files found in $APP_DIR/build!"
+            exit 1
+          fi
+
+          echo "Found the following APK files:"
+          echo "$APK_PATHS"
+
+          # Pick the first one for artifact uploading
+          FIRST_APK=$(echo "$APK_PATHS" | head -n 1)
+          echo "Selected APK path for artifact: $FIRST_APK"
+          echo "apk_path=$FIRST_APK" >> $GITHUB_OUTPUT
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-app-debug-apk
+          path: ${{ steps.locate.outputs.apk_path }}
+          if-no-files-found: error
