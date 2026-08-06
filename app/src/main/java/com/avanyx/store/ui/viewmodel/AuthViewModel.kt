@@ -1,6 +1,7 @@
 package com.avanyx.store.ui.viewmodel
 
 import android.app.Activity
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -123,6 +124,17 @@ class AuthViewModel(
             res.fold(
                 onSuccess = { _uiState.value = AuthUiState.Success("Phone OTP Verification successful!") },
                 onFailure = { _uiState.value = AuthUiState.Error(it.message ?: "Invalid OTP Code") }
+            )
+        }
+    }
+
+    fun signInWithGoogle(context: Context, webClientId: String = "754931220482-uelrmk4f4vmeeldpikq5doqg4hrq8mv8.apps.googleusercontent.com") {
+        _uiState.value = AuthUiState.Loading
+        viewModelScope.launch {
+            val res = repository.signInWithGoogle(context, webClientId)
+            res.fold(
+                onSuccess = { _uiState.value = AuthUiState.Success("Google Sign-In successful!") },
+                onFailure = { _uiState.value = AuthUiState.Error(it.message ?: "Google Sign-In failed") }
             )
         }
     }

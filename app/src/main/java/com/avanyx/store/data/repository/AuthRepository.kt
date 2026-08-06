@@ -1,6 +1,7 @@
 package com.avanyx.store.data.repository
 
 import android.app.Activity
+import android.content.Context
 import android.util.Log
 import com.avanyx.store.firebase.FirebaseAuthManager
 import com.avanyx.store.firebase.FirestoreService
@@ -106,6 +107,17 @@ class AuthRepository(
         return authResult.fold(
             onSuccess = { firebaseUser ->
                 val userDoc = ensureUserDocumentCreated(firebaseUser, "phone")
+                Result.success(userDoc)
+            },
+            onFailure = { Result.failure(it) }
+        )
+    }
+
+    suspend fun signInWithGoogle(context: Context, webClientId: String = "754931220482-uelrmk4f4vmeeldpikq5doqg4hrq8mv8.apps.googleusercontent.com"): Result<FirestoreUser> {
+        val authResult = authManager.signInWithGoogle(context, webClientId)
+        return authResult.fold(
+            onSuccess = { firebaseUser ->
+                val userDoc = ensureUserDocumentCreated(firebaseUser, "google.com")
                 Result.success(userDoc)
             },
             onFailure = { Result.failure(it) }

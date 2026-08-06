@@ -365,8 +365,12 @@ fun LoginScreen(
                                 // Google Provider
                                 OutlinedButton(
                                     onClick = {
-                                        onShowMessage("Triggering Google OAuth Provider...")
-                                        authViewModel.signInWithGoogleIdToken("mock_google_token")
+                                        val webClientId = try {
+                                            context.getString(com.avanyx.store.R.string.default_web_client_id)
+                                        } catch (e: Exception) {
+                                            "754931220482-uelrmk4f4vmeeldpikq5doqg4hrq8mv8.apps.googleusercontent.com"
+                                        }
+                                        authViewModel.signInWithGoogle(context, webClientId)
                                     },
                                     modifier = Modifier
                                         .weight(1f)

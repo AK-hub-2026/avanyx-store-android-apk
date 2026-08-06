@@ -1,10 +1,20 @@
 package com.avanyx.store.firebase
 
 import android.app.Activity
+import android.content.Context
 import android.util.Log
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FacebookAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthWebException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GithubAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
@@ -97,7 +107,119 @@ class FirebaseAuthManager(
         }
     }
 
-    // 3. Google Sign-In with ID Token
+    // 3. Google Sign-In via Credential Manager & Google Identity Services
+    suspend fun signInWithGoogle(context: Context, webClientId: String = "754931220482-uelrmk4f4vmeeldpikq5doqg4hrq8mv8.apps.googleusercontent.com"): Result<FirebaseUser> {
+        Log.d(TAG, "=== RUNTIME GOOGLE SIGN-IN DEBUG START ===")
+        return try {
+            // Step 1: CredentialManager request
+            Log.d(TAG, "[DEBUG_LOG_1] Initializing CredentialManager request with webClientId: $webClientId")
+            val credentialManager = CredentialManager.create(context)
+            val googleIdOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setServerClientId(webClientId)
+                .setAutoSelectEnabled(false)
+                .build()
+
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(googleIdOption)
+                .build()
+
+            // Step 2: Google account selection
+            Log.d(TAG, "[DEBUG_LOG_2] Prompting user for Google account selection via CredentialManager...")
+            val result = credentialManager.getCredential(context, request)
+            Log.d(TAG, "[DEBUG_LOG_2] Account selection completed. Credential type: ${result.credential.type}")
+            val credential = result.credential
+
+            // Step 3: Google ID Token received
+            if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                val idToken = googleIdTokenCredential.idToken
+                Log.d(TAG, "[DEBUG_LOG_3] Google ID Token received successfully! Length: ${idToken.length}, Account ID: ${googleIdTokenCredential.id}, DisplayName: ${googleIdTokenCredential.displayName}")
+
+                // Step 4: GoogleAuthProvider.getCredential()
+                Log.d(TAG, "[DEBUG_LOG_4] Creating Firebase GoogleAuthProvider credential using ID token...")
+                val authCredential = GoogleAuthProvider.getCredential(idToken, null)
+                Log.d(TAG, "[DEBUG_LOG_4] AuthCredential generated: providerId=${authCredential.provider}, signInMethod=${authCredential.signInMethod}")
+
+                // Step 5: Firebase signInWithCredential()
+                Log.d(TAG, "[DEBUG_LOG_5] Calling FirebaseAuth.signInWithCredential()...")
+                val authResult = auth.signInWithCredential(authCredential).await()
+                val user = authResult.user ?: throw Exception("Firebase user is null after signInWithCredential")
+                Log.d(TAG, "[DEBUG_LOG_5] Firebase signInWithCredential() succeeded! User UID: ${user.uid}, Email: ${user.email}")
+                Log.d(TAG, "=== RUNTIME GOOGLE SIGN-IN DEBUG SUCCESS ===")
+                Result.success(user)
+            } else {
+                val errorMsg = "Received unexpected credential type from Credential Manager: ${credential.type}"
+                Log.e(TAG, "[DEBUG_LOG_6] Error: $errorMsg")
+                throw Exception(errorMsg)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "=== RUNTIME GOOGLE SIGN-IN FAILURE DETECTED ===")
+
+            // Step 6: Exception identification
+            val exceptionType = when (e) {
+                is FirebaseAuthException -> "FirebaseAuthException"
+                is GetCredentialException -> "GetCredentialException (${e.type})"
+                else -> e.javaClass.simpleName
+            }
+            Log.e(TAG, "[DEBUG_LOG_6] Firebase/Runtime Exception Type: $exceptionType")
+
+            // Step 7: Stacktrace
+            Log.e(TAG, "[DEBUG_LOG_7] Complete Stacktrace:\n${Log.getStackTraceString(e)}")
+
+            // Step 8: Error Code
+            val errorCode = when (e) {
+                is FirebaseAuthException -> e.errorCode
+                is GetCredentialException -> e.type
+                else -> "N/A"
+            }
+            Log.e(TAG, "[DEBUG_LOG_8] Error Code: $errorCode")
+
+            // Step 9: Error Message
+            Log.e(TAG, "[DEBUG_LOG_9] Error Message: ${e.message ?: "No error message"}")
+            Log.e(TAG, "[DEBUG_LOG_9] Localized Message: ${e.localizedMessage ?: "No localized message"}")
+            Log.e(TAG, "[DEBUG_LOG_9] Cause: ${e.cause?.toString() ?: "No underlying cause"}")
+
+            val userFriendlyMessage = when {
+                e is NoCredentialException || (e is GetCredentialException && e.type.contains("TYPE_NO_CREDENTIAL")) -> {
+                    Log.d(TAG, "[DEBUG_LOG_FALLBACK] No credential on device. Checking for Activity context to trigger OAuthProvider fallback...")
+                    val activity = context as? Activity
+                    if (activity != null) {
+                        try {
+                            Log.d(TAG, "[DEBUG_LOG_FALLBACK] Triggering OAuthProvider.newBuilder(\"google.com\") web browser flow...")
+                            val provider = OAuthProvider.newBuilder("google.com")
+                            val pendingResultTask = auth.pendingAuthResult
+                            val authResult: AuthResult = if (pendingResultTask != null) {
+                                pendingResultTask.await()
+                            } else {
+                                auth.startActivityForSignInWithProvider(activity, provider.build()).await()
+                            }
+                            val user = authResult.user ?: throw Exception("OAuthProvider Google sign-in returned null user")
+                            Log.d(TAG, "[DEBUG_LOG_FALLBACK] OAuthProvider Google sign-in succeeded! UID: ${user.uid}")
+                            return Result.success(user)
+                        } catch (fallbackException: Exception) {
+                            Log.e(TAG, "[DEBUG_LOG_FALLBACK] OAuthProvider fallback failed", fallbackException)
+                            if (fallbackException is FirebaseAuthWebException) {
+                                "Google Sign-In web operation was canceled."
+                            } else {
+                                fallbackException.message ?: "Google Sign-In failed"
+                            }
+                        }
+                    } else {
+                        "No Google Account found on this device. Please sign in to a Google account in Settings, or try again."
+                    }
+                }
+                e is GetCredentialException ->
+                    "Google Sign-In failed (${e.type}): ${e.message ?: "No credentials available"}"
+                e is FirebaseAuthWebException ->
+                    "Google Sign-In web operation was canceled."
+                else -> e.message ?: "Google Sign-In failed"
+            }
+
+            Result.failure(Exception(userFriendlyMessage, e))
+        }
+    }
+
     suspend fun signInWithGoogleIdToken(idToken: String): Result<FirebaseUser> {
         return try {
             val credential = GoogleAuthProvider.getCredential(idToken, null)
@@ -124,7 +246,8 @@ class FirebaseAuthManager(
             Result.success(user)
         } catch (e: Exception) {
             Log.e(TAG, "signInWithGitHub failed", e)
-            Result.failure(e)
+            val msg = if (e is FirebaseAuthWebException) "GitHub login was canceled by the user." else (e.message ?: "GitHub login failed")
+            Result.failure(Exception(msg, e))
         }
     }
 
@@ -142,7 +265,8 @@ class FirebaseAuthManager(
             Result.success(user)
         } catch (e: Exception) {
             Log.e(TAG, "signInWithFacebook failed", e)
-            Result.failure(e)
+            val msg = if (e is FirebaseAuthWebException) "Facebook login was canceled by the user." else (e.message ?: "Facebook login failed")
+            Result.failure(Exception(msg, e))
         }
     }
 
