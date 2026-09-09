@@ -1,0 +1,16 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Binary files - preserve exact bytes (do not perform line ending conversion)
+*.jar binary
+*.keystore binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.so binary
+*.aar binary
+*.zip binary
+*.tar.gz binary
