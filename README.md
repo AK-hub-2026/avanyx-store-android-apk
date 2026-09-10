@@ -1,21 +1,94 @@
-# AVANYX Store
+![Platform](https://img.shields.io/badge/Platform-Android-green)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.x-purple)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-blue)
+![License](https://img.shields.io/badge/License-MIT-yellow)
 
-AVANYX Store is a premium, native Android application marketplace designed with a clean, minimal, and high-performance user interface inspired by modern Material 3 design guidelines.
+🇮🇳 AVANYX Store — Open Source Android Client
 
-This is Phase 1 of the AVANYX Store product ecosystem.
+AVANYX Store is an Indian-first Android application marketplace focused on secure APK distribution, verified developers, and educational publishing.
 
-## Project Structure
-- `app/`: The core Android application developed in modern Kotlin and Jetpack Compose.
-- `web-store/`: Web store showcase (Placeholder for future phases).
-- `developer-console/`: Developer uploading and analytics portal (Placeholder for future phases).
-- `admin-console/`: System administration console (Placeholder for future phases).
-- `backend/`: Scalable backend APIs and secure database layer (Placeholder for future phases).
-- `docs/`: Technical documentation regarding architecture, roadmap, and security.
+This repository contains the official open-source Android client of the AVANYX Store ecosystem. It is designed with Kotlin, Jetpack Compose, Firebase Authentication, and Firestore to provide a modern, safe, and lightweight app store experience for Android users.
 
-## Technologies Used
-- **Language:** Kotlin
-- **UI:** Jetpack Compose (Material 3)
-- **Architecture:** Clean Architecture with MVVM
-- **Navigation:** Type-safe Navigation Compose
-- **Build System:** Gradle Kotlin DSL
-- **CI/CD:** GitHub Actions for automated debug APK compilation
+«Current Version: v3.0 Community Edition»
+
+---
+
+✨ Features
+
+- Secure APK download and installation.
+- Verified developer and student publishing support.
+- Firebase Authentication (Email, Google, GitHub).
+- Live Firestore app catalog synchronization.
+- Material 3 UI with Jetpack Compose.
+- Update checker and download manager.
+- Built for low-end Android devices.
+
+---
+
+📂 Project Structure
+
+- "app/" — Android application source.
+- "docs/" — Documentation and architecture.
+- "assets/" — Icons, screenshots, branding assets.
+- "firebase/" — Public Firebase configuration examples.
+- "scripts/" — Build and utility scripts.
+
+---
+
+🛠 Technology Stack
+
+- Kotlin
+- Jetpack Compose (Material 3)
+- Firebase Authentication
+- Cloud Firestore
+- GitHub Actions (CI/CD)
+- Clean Architecture + MVVM
+
+---
+
+🌍 Open Source Scope
+
+This repository is open for:
+
+- Learning Android development.
+- Bug fixes.
+- UI/UX improvements.
+- Accessibility improvements.
+- Localization and translations.
+- Documentation improvements.
+- Community pull requests.
+
+Contributions are welcome through GitHub Issues and Pull Requests.
+
+---
+
+🔒 Private Infrastructure (Not Included)
+
+The following components remain private and are not part of this repository:
+
+- AVANYX Store Backend APIs.
+- Admin Console.
+- Developer Console backend.
+- Student Console backend.
+- Promotion Manager.
+- Payment & Subscription services.
+- Analytics pipeline.
+- Security scanning engine.
+- Production Firebase secrets, API keys, and service credentials.
+
+---
+
+🤝 Community Edition vs Future Pro Edition
+
+This repository is the Community Edition of AVANYX Store.
+
+Future cloud services (subscriptions, premium features, AI services, and payment infrastructure) will be developed separately and are not included in the open-source client.
+
+---
+
+📄 License
+
+The Android client is licensed under the MIT License.
+
+AVANYX®, AVANYX Store®, logos, trademarks, branding assets, and backend services remain the intellectual property of AVANYX.
+
