@@ -1,6 +1,41 @@
-# AVANYX Store - Security Policies
+#Security Policy
 
-## Client-Side Security
-- APK installation routines must adhere to Google Play Protect policies.
-- Phase 1 does not install APKs to maintain security and sandbox guidelines.
-- Future APK installation will request proper package installation permissions.
+Supported Versions
+
+Version| Status
+v3.x| Supported
+v2.x| Security fixes only
+Older versions| Not supported
+
+Reporting Security Vulnerabilities
+
+Please do not publish security vulnerabilities publicly.
+
+Report vulnerabilities through a private GitHub Security Advisory or contact the AVANYX maintainers.
+
+Include:
+
+- Vulnerability description.
+- Steps to reproduce.
+- Affected version.
+- Possible impact.
+
+Scope
+
+This repository includes only the open-source Android client.
+
+The following systems are private and are not part of this repository:
+
+- Backend APIs
+- Payment services
+- Admin infrastructure
+- Analytics backend
+- Production Firebase credentials
+- OAuth secrets
+
+Security Goals
+
+- Protect user privacy.
+- Verify APK integrity.
+- Prevent malicious uploads.
+- Follow responsible disclosure practices.
