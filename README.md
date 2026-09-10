@@ -3,6 +3,8 @@
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
+Official open-source Android client for AVANYX Store — Secure APK marketplace built with Kotlin, Jetpack Compose, Firebase & Firestore.
+
 🇮🇳 AVANYX Store — Open Source Android Client
 
 AVANYX Store is an Indian-first Android application marketplace focused on secure APK distribution, verified developers, and educational publishing.
