@@ -92,3 +92,19 @@ The Android client is licensed under the MIT License.
 
 AVANYX®, AVANYX Store®, logos, trademarks, branding assets, and backend services remain the intellectual property of AVANYX.
 
+## 📱 Screenshots
+
+Screenshots are available in the `/assets/screenshots/` directory.
+
+## 📥 Download
+
+Download the latest APK from the GitHub Releases page.
+
+## 🚀 Roadmap
+
+- AVANYX Store v3.0
+- Student Console
+- Developer Console
+- Admin Console
+- AVANYX Identity (Future)
+  
