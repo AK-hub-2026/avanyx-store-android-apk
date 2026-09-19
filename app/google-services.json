@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "754931220482",
+    "project_id": "avanyx-store",
+    "storage_bucket": "avanyx-store.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:754931220482:android:85ff89f07029ef561b671b",
+        "android_client_info": {
+          "package_name": "com.avanyx.appstore.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "754931220482-nnknl4rrmrgbq6c2bbmtrukrtkq6ft4r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avanyx.appstore.dev",
+            "certificate_hash": "c540bdb8f72917b0c9ce7eeed4b62d7d24805301"
+          }
+        },
+        {
+          "client_id": "754931220482-pb2p3fihk6hhd1ittb2ta9a58jguorqf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.avanyx.appstore.dev",
+            "certificate_hash": "4972f5ad4a83c56ffc89dd4443fdf18f4151910b"
+          }
+        },
+        {
+          "client_id": "754931220482-uelrmk4f4vmeeldpikq5doqg4hrq8mv8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2gHVUDSHO018MEMDQbz_ys2E2mGGjF1k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "754931220482-uelrmk4f4vmeeldpikq5doqg4hrq8mv8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

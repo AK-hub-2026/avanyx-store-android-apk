@@ -1,0 +1,37 @@
+AVANYX STORE - RELEASE KEYSTORE CERTIFICATE RECORD
+================================================
+
+Keystore:
+avanyx-release.jks
+
+Issuer:
+C=IN,ST=Uttar Pradesh,L=Sultanpur,OU=AVANYX,O=AVANYX,CN=AVANYX STORE
+
+Serial Number:
+16925403160821461649
+
+Created at:
+Wed Aug 12 12:25:21 GMT+05:30 2026
+
+Valid until:
+Thu Jul 30 12:25:21 GMT+05:30 2076
+
+Alias Fingerprints
+------------------
+MD5:
+05:53:9d:d6:e7:a5:39:2c:14:86:52:56:4a:17:a2:13
+
+SHA-1:
+49:72:f5:ad:4a:83:c5:6f:fc:89:dd:44:43:fd:f1:8f:41:51:91:0b
+
+SHA-256:
+13:2a:2a:a3:ed:69:46:94:c4:04:60:e1:70:fa:25:47:22:94:7d:6b:12:55:0e:ea:22:6b:f1:ef:5f:7e:36:9d
+
+Keystore Fingerprint
+--------------------
+SHA-1:
+77:bb:ba:5b:08:c2:7b:c9:18:dd:0f:51:3b:7b:fc:09:33:1c:ab:cd
+
+NOTE:
+This file is a human-readable record of certificate/fingerprint information.
+It is NOT the private key, NOT the JKS keystore, and cannot be used to sign an APK.
