@@ -58,7 +58,6 @@ class FirestoreService {
         const val COLLECTION_FEATURED_BANNERS = "featured_banners"
         const val COLLECTION_UPDATE_HISTORY = "update_history"
         const val COLLECTION_PURCHASES = "purchases"
-        const val COLLECTION_BILLING_AUDITS = "billing_audits"
         const val COLLECTION_ANNOUNCEMENTS = "announcements"
         const val COLLECTION_REWARDS = "rewards"
         const val COLLECTION_REWARD_HISTORY = "reward_history"
@@ -947,34 +946,6 @@ class FirestoreService {
                 trySend(list)
             }
         awaitClose { listener.remove() }
-    }
-
-    // 17. Billing Audits Collection (billing_audits/{auditId})
-    suspend fun recordBillingAudit(audit: FirestoreBillingAudit): Result<Unit> {
-        return try {
-            val docId = if (audit.auditId.isNotBlank()) audit.auditId else db.collection(COLLECTION_BILLING_AUDITS).document().id
-            val finalAudit = audit.copy(auditId = docId)
-            db.collection(COLLECTION_BILLING_AUDITS).document(docId).set(finalAudit, SetOptions.merge()).await()
-            Log.d(TAG, "Firestore write success: billing_audits/$docId (.set)")
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Log.e(TAG, "recordBillingAudit failed", e)
-            Result.failure(e)
-        }
-    }
-
-    suspend fun getBillingAudits(): Result<List<FirestoreBillingAudit>> {
-        return try {
-            val snapshot = db.collection(COLLECTION_BILLING_AUDITS)
-                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                .get()
-                .await()
-            val list = snapshot.toObjects(FirestoreBillingAudit::class.java)
-            Result.success(list)
-        } catch (e: Exception) {
-            Log.e(TAG, "getBillingAudits failed", e)
-            Result.failure(e)
-        }
     }
 
     // 18. Announcements (READ ONLY on Android)

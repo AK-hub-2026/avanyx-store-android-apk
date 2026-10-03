@@ -77,16 +77,13 @@ fun AvanyxPayBottomSheet(
     val db = remember(context) { AppDatabase.getInstance(context) }
     val currentUser = auth.currentUser
 
-    val effectiveFallbackAmount = if (amount > 0.0) amount else fallbackAmount
-    val effectiveItemName = if (itemName.isNotBlank()) itemName else if (appName.isNotBlank()) "$appName Full License" else "Item Purchase"
-
-    // Backend Resolution State
+    // Backend Resolution State - Authoritative from Firestore backend only
     var isLoadingProduct by remember { mutableStateOf(true) }
     var isProductVerified by remember { mutableStateOf(false) }
     var productError by remember { mutableStateOf<String?>(null) }
     var resolvedAppName by remember { mutableStateOf(appName) }
-    var resolvedItemTitle by remember { mutableStateOf(effectiveItemName) }
-    var resolvedPrice by remember { mutableDoubleStateOf(effectiveFallbackAmount) }
+    var resolvedItemTitle by remember { mutableStateOf(itemName) }
+    var resolvedPrice by remember { mutableDoubleStateOf(0.0) }
 
     // Selected Method: "UPI_INTENT" or "UPI_QR"
     var selectedMethod by remember { mutableStateOf("UPI_INTENT") }
@@ -95,71 +92,50 @@ fun AvanyxPayBottomSheet(
     var completedPurchase by remember { mutableStateOf<FirestorePurchase?>(null) }
     var transactionId by remember { mutableStateOf("AVX-${System.currentTimeMillis().toString().takeLast(8)}") }
 
-    // Authoritative backend verification
-    LaunchedEffect(appId, productId, amount, fallbackAmount) {
+    // Authoritative backend verification - client prices are never trusted
+    LaunchedEffect(appId, productId) {
         isLoadingProduct = true
         productError = null
 
         withContext(Dispatchers.IO) {
             try {
-                // 1. If productId is provided, query Firestore in-app products catalog
+                // 1. In-App Product or Subscription SKU from Billing SDK
                 if (productId.isNotBlank() && productId != "app_license") {
                     val prodResult = firestoreService.getProduct(appId, productId)
                     val product = prodResult.getOrNull()
 
                     if (product != null && product.active && product.price > 0.0) {
+                        resolvedAppName = if (appName.isNotBlank()) appName else {
+                            val app = firestoreService.getApp(appId).getOrNull()
+                            app?.name ?: appId
+                        }
                         resolvedItemTitle = product.title
                         resolvedPrice = product.price
                         isProductVerified = true
+                    } else if (product != null && !product.active) {
+                        isProductVerified = false
+                        productError = "The product '$productId' is inactive or disabled on the AVANYX Billing backend."
                     } else {
-                        // Check if it's the app itself
-                        val appResult = firestoreService.getApp(appId)
-                        val app = appResult.getOrNull()
-                        if (app != null && (app.isPaid || app.price > 0.0)) {
-                            resolvedAppName = app.name
-                            resolvedItemTitle = effectiveItemName.ifBlank { "${app.name} Full License" }
-                            resolvedPrice = if (effectiveFallbackAmount > 0.0) effectiveFallbackAmount else app.price
-                            isProductVerified = true
-                        } else if (effectiveFallbackAmount > 0.0) {
-                            resolvedAppName = appName.ifBlank { app?.name ?: appId }
-                            resolvedItemTitle = effectiveItemName
-                            resolvedPrice = effectiveFallbackAmount
-                            isProductVerified = true
-                        } else {
-                            isProductVerified = false
-                            productError = "The product '$productId' is not registered or active in the AVANYX Billing catalog for app '$appId'."
-                        }
+                        isProductVerified = false
+                        productError = "The product '$productId' is not registered in the AVANYX Billing catalog for '$appId'. Register products in the AVANYX Developer Console."
                     }
                 } else {
-                    // 2. Query the App document to resolve paid app license
+                    // 2. Paid App License direct purchase in the store
                     val appResult = firestoreService.getApp(appId)
                     val app = appResult.getOrNull()
-                    if (app != null && (app.isPaid || app.price > 0.0)) {
+                    if (app != null && (app.isPaid || app.price > 0.0) && app.price > 0.0) {
                         resolvedAppName = app.name
-                        resolvedItemTitle = effectiveItemName.ifBlank { "${app.name} Full License" }
-                        resolvedPrice = if (effectiveFallbackAmount > 0.0) effectiveFallbackAmount else app.price
-                        isProductVerified = true
-                    } else if (effectiveFallbackAmount > 0.0) {
-                        // In-Store purchase of a paid app
-                        resolvedAppName = appName.ifBlank { appId }
-                        resolvedItemTitle = effectiveItemName
-                        resolvedPrice = effectiveFallbackAmount
+                        resolvedItemTitle = "${app.name} Full License"
+                        resolvedPrice = app.price
                         isProductVerified = true
                     } else {
                         isProductVerified = false
-                        productError = "No paid item or product found on the backend for $appId."
+                        productError = "Application '$appId' is not registered as a paid app on AVANYX Store."
                     }
                 }
             } catch (e: Exception) {
-                if (effectiveFallbackAmount > 0.0) {
-                    resolvedAppName = appName.ifBlank { appId }
-                    resolvedItemTitle = effectiveItemName
-                    resolvedPrice = effectiveFallbackAmount
-                    isProductVerified = true
-                } else {
-                    isProductVerified = false
-                    productError = "Failed to verify product with AVANYX Billing backend: ${e.message}"
-                }
+                isProductVerified = false
+                productError = "Failed to verify product with AVANYX Billing backend: ${e.message}"
             } finally {
                 isLoadingProduct = false
             }

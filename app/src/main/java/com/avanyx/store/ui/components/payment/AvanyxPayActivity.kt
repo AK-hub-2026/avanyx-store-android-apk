@@ -15,36 +15,66 @@ import androidx.compose.ui.graphics.Color
 import com.avanyx.store.ui.theme.MyApplicationTheme
 
 /**
- * Inter-App Billing Gateway Activity.
- * Allows external applications (e.g. Games like Free Fire, third party utilities, sandboxed APKs)
- * to initiate AVANYX Pay In-App Billing popups via:
- * 1. Intent: com.avanyx.store.ACTION_PAY / com.avanyx.store.ACTION_BILLING
- * 2. Deep Link URI: avanyxpay://checkout?... or https://pay.avanyx.store/checkout?...
+ * Native AVANYX Pay Inter-App Billing Gateway Activity.
+ *
+ * Invoked ONLY when an external Developer App sends a billing request
+ * via the AVANYX Billing SDK through:
+ * 1. Intent Actions:
+ *    - com.avanyx.store.ACTION_PAY
+ *    - com.avanyx.store.ACTION_BILLING
+ * 2. Deep Link URLs:
+ *    - avanyxpay://checkout?appId={appId}&productId={productId}
+ *    - https://pay.avanyx.store/checkout?appId={appId}&productId={productId}
+ *
+ * Strict Architecture:
+ * - Product details & price are resolved from backend/Firestore only.
+ * - Client-provided prices are never trusted.
+ * - Verification & transaction token returned to calling Developer App.
  */
 class AvanyxPayActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Parse incoming intent or deep link parameters
+        // Parse incoming intent or deep link parameters from calling Developer App
         val uri = intent.data
         val appId = intent.getStringExtra("appId")
             ?: uri?.getQueryParameter("appId")
-            ?: "com.avanyx.security.pro"
+            ?: intent.getStringExtra("package")
+            ?: callingPackage
+            ?: ""
+
+        val productId = intent.getStringExtra("productId")
+            ?: intent.getStringExtra("sku")
+            ?: uri?.getQueryParameter("productId")
+            ?: uri?.getQueryParameter("sku")
+            ?: ""
 
         val appName = intent.getStringExtra("appName")
             ?: uri?.getQueryParameter("appName")
-            ?: "AVANYX Protect Pro"
+            ?: ""
 
-        val itemName = intent.getStringExtra("itemName")
-            ?: uri?.getQueryParameter("itemName")
-            ?: "100 Diamonds & Premium Pass"
+        val developerPayload = intent.getStringExtra("developerPayload")
+            ?: uri?.getQueryParameter("developerPayload")
+            ?: ""
 
-        val amountStr = intent.getStringExtra("amount")
-            ?: uri?.getQueryParameter("amount")
-            ?: "${intent.getDoubleExtra("amount", 80.0)}"
-
-        val amount = amountStr.toDoubleOrNull() ?: 80.0
+        // Validate that caller provided both mandatory product identifiers
+        if (appId.isBlank() || productId.isBlank()) {
+            Toast.makeText(
+                this,
+                "AVANYX Billing: Missing appId or productId in request",
+                Toast.LENGTH_LONG
+            ).show()
+            val resultIntent = Intent().apply {
+                putExtra("status", "FAILED")
+                putExtra("error", "MISSING_PARAMETERS")
+                putExtra("message", "Both appId and productId must be specified by the calling app SDK.")
+                putExtra("developerPayload", developerPayload)
+            }
+            setResult(Activity.RESULT_CANCELED, resultIntent)
+            finish()
+            return
+        }
 
         setContent {
             MyApplicationTheme {
@@ -53,27 +83,40 @@ class AvanyxPayActivity : ComponentActivity() {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.45f))
+                        .background(Color.Black.copy(alpha = 0.5f))
                 ) {
                     AvanyxPayBottomSheet(
                         isOpen = isOpen,
                         onDismiss = {
                             isOpen = false
-                            setResult(Activity.RESULT_CANCELED)
+                            val resultIntent = Intent().apply {
+                                putExtra("status", "CANCELED")
+                                putExtra("error", "USER_CANCELED")
+                                putExtra("appId", appId)
+                                putExtra("productId", productId)
+                                putExtra("developerPayload", developerPayload)
+                            }
+                            setResult(Activity.RESULT_CANCELED, resultIntent)
                             finish()
                         },
                         appId = appId,
+                        productId = productId,
                         appName = appName,
-                        itemName = itemName,
-                        amount = amount,
+                        amount = 0.0, // Authoritative price MUST be resolved from backend
                         onPaymentSuccess = { purchase ->
                             val resultIntent = Intent().apply {
-                                putExtra("transactionRef", purchase.transactionId)
-                                putExtra("purchaseToken", purchase.purchaseToken)
-                                putExtra("appId", appId)
-                                putExtra("itemName", itemName)
-                                putExtra("amount", amount)
                                 putExtra("status", "SUCCESS")
+                                putExtra("transactionId", purchase.id)
+                                putExtra("transactionRef", purchase.transactionRef)
+                                putExtra("purchaseToken", purchase.purchaseToken)
+                                putExtra("appId", purchase.appId)
+                                putExtra("productId", purchase.productId.ifBlank { productId })
+                                putExtra("itemName", purchase.itemName)
+                                putExtra("amount", purchase.amount)
+                                putExtra("currency", purchase.currency)
+                                putExtra("paymentMethod", purchase.paymentMethod)
+                                putExtra("timestamp", purchase.timestamp)
+                                putExtra("developerPayload", developerPayload)
                             }
                             setResult(Activity.RESULT_OK, resultIntent)
                             finish()

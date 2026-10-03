@@ -252,23 +252,6 @@ data class FirestoreProduct(
 )
 
 @IgnoreExtraProperties
-data class FirestoreBillingAudit(
-    val auditId: String = "",
-    val timestamp: Long = System.currentTimeMillis(),
-    val userId: String = "",
-    val appId: String = "",
-    val appName: String = "",
-    val step1PopupOpens: Boolean = true,
-    val step2UpiIntentOpens: Boolean = true,
-    val step3QrLoads: Boolean = true,
-    val step4PurchaseRecordCreated: Boolean = true,
-    val step5NotificationDelivered: Boolean = true,
-    val status: String = "PASSED",
-    val verifiedBy: String = "AVANYX Billing & Audit Engine v3.7.3",
-    val notes: String = "All billing pipeline validation tests passed successfully"
-)
-
-@IgnoreExtraProperties
 data class FirestoreReward(
     val id: String = "",
     val title: String = "",

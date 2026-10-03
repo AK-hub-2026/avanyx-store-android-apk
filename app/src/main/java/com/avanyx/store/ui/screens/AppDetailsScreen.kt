@@ -143,7 +143,7 @@ fun AppDetailsScreen(
     }
     val hasStoreUpdate = isBuiltInStoreApp && ((app?.versionCode ?: 0L) > currentAppVersionCode)
     var showPayDialog by remember { mutableStateOf(false) }
-    var payAmount by remember { mutableDoubleStateOf(99.0) }
+    var payAmount by remember { mutableDoubleStateOf(0.0) }
     var payItemName by remember { mutableStateOf("Full License") }
     var locallyPurchased by remember { mutableStateOf(false) }
     val firestoreService = remember { com.avanyx.store.firebase.FirestoreService() }
@@ -298,15 +298,6 @@ fun AppDetailsScreen(
                                 onShowMessage("Official website app link copied!")
                             },
                             modifier = Modifier.testTag("app_menu_copy_link")
-                        )
-                        DropdownMenuItem(
-                            text = { Text("AVANYX Pay (In-App Purchase)") },
-                            leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                            onClick = {
-                                showTopMenu = false
-                                showPayDialog = true
-                            },
-                            modifier = Modifier.testTag("app_menu_avanyx_pay")
                         )
                         if (!isBuiltInStoreApp && installedApp != null) {
                             HorizontalDivider()
@@ -808,11 +799,11 @@ fun AppDetailsScreen(
                             }
                         } else {
                             // If paid app and not yet purchased -> AVANYX Pay BUY button
-                            val isPaidApp = app.isPaid || app.price > 0.0
+                            val isPaidApp = app.isPaid && app.price > 0.0
                             if (isPaidApp && !isPurchased) {
                                 Button(
                                     onClick = {
-                                        payAmount = if (app.price > 0.0) app.price else 99.0
+                                        payAmount = app.price
                                         payItemName = "${app.name} Full License"
                                         showPayDialog = true
                                     },
@@ -832,7 +823,7 @@ fun AppDetailsScreen(
                                         modifier = Modifier.size(18.dp).padding(end = 6.dp)
                                     )
                                     Text(
-                                        text = "BUY ₹${if (app.price > 0.0) app.price.toInt() else 99}",
+                                        text = "BUY ₹${app.price.toInt()}",
                                         style = MaterialTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.ExtraBold,
                                             fontSize = 16.sp
@@ -1518,6 +1509,7 @@ fun AppDetailsScreen(
             onDismiss = { showPayDialog = false },
             appId = app.id,
             appName = app.name,
+            productId = "app_license",
             itemName = payItemName,
             amount = payAmount,
             appIconUrl = app.iconUrl,
