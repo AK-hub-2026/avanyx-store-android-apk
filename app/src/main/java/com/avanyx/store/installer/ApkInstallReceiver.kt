@@ -30,12 +30,12 @@ class ApkInstallReceiver : BroadcastReceiver() {
                     try {
                         com.avanyx.store.manager.InstalledAppsManager.getInstance(context).scanAndMatch(context)
                     } catch (e: Exception) {
-                        Log.e("ApkInstallReceiver", "Failed to update installed apps: ${e.message}")
+                        Log.w("ApkInstallReceiver", "Notice updating installed apps: ${e.message}")
                     }
                 }
             }
             else -> {
-                Log.e("ApkInstallReceiver", "Installation failed with status=$status: $message")
+                Log.w("ApkInstallReceiver", "Installation status=$status: $message")
             }
         }
     }

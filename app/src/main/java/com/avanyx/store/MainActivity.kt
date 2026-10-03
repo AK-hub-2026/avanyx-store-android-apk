@@ -52,6 +52,13 @@ class MainActivity : ComponentActivity() {
 
         // Start realtime notifications and wishlist sync
         val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+        if (auth.currentUser == null) {
+            auth.signInAnonymously().addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    android.util.Log.d("MainActivity", "Guest session initialized: ${task.result?.user?.uid}")
+                }
+            }
+        }
         firestoreRepository.startRealtimeNotificationSync(lifecycleScope, auth.currentUser?.uid)
         auth.addAuthStateListener { firebaseAuth ->
             val uid = firebaseAuth.currentUser?.uid

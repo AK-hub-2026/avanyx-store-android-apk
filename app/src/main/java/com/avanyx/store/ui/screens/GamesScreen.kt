@@ -97,20 +97,25 @@ fun GamesScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Games",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 28.sp,
-                            color = MaterialTheme.colorScheme.onBackground
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = "Games",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 28.sp,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
                         )
-                    )
-                    Text(
-                        text = "Top interactive experiences curated by AVANYX",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        Text(
+                            text = "Top interactive experiences curated by AVANYX",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Box(
@@ -257,7 +262,7 @@ fun GamesScreen(
                             )
                             onShowMessage("Downloading ${game.name}...")
                         },
-                        onDeveloperClick = onNavigateToDeveloper
+                        onDeveloperClick = null
                     )
                 }
             }

@@ -57,6 +57,12 @@ class FirestoreService {
         const val COLLECTION_SEARCH_HISTORY = "search_history"
         const val COLLECTION_FEATURED_BANNERS = "featured_banners"
         const val COLLECTION_UPDATE_HISTORY = "update_history"
+        const val COLLECTION_PURCHASES = "purchases"
+        const val COLLECTION_BILLING_AUDITS = "billing_audits"
+        const val COLLECTION_ANNOUNCEMENTS = "announcements"
+        const val COLLECTION_REWARDS = "rewards"
+        const val COLLECTION_REWARD_HISTORY = "reward_history"
+        const val COLLECTION_PURCHASE_NOTIFICATIONS = "purchase_notifications"
     }
 
     // 1. Users Collection (users/{uid})
@@ -369,6 +375,8 @@ class FirestoreService {
             ?: "Official application from $developer on AVANYX Store."
         val status = doc.safeString("status", "appStatus") ?: "PUBLISHED"
         val features = doc.safeStringList("features")
+        val isPaid = doc.safeBoolean("isPaid", "is_paid", "paid")
+        val price = doc.safeDouble("price", "cost", def = 0.0)
 
         return FirestoreApp(
             id = docId,
@@ -394,8 +402,33 @@ class FirestoreService {
             changelog = changelog,
             fullDescription = fullDescription,
             features = features,
+            isPaid = isPaid,
+            price = price,
             status = status
         )
+    }
+
+    suspend fun getApp(appId: String): Result<FirestoreApp?> {
+        return try {
+            val db = safeGetFirestore() ?: getDefaultFirestore()
+            val doc = db.collection(COLLECTION_APPS).document(appId).get().await()
+            if (doc.exists()) {
+                Result.success(parseFirestoreAppDocument(doc))
+            } else {
+                val querySnap = db.collection(COLLECTION_APPS)
+                    .whereEqualTo("id", appId)
+                    .limit(1)
+                    .get().await()
+                if (!querySnap.isEmpty) {
+                    Result.success(parseFirestoreAppDocument(querySnap.documents[0]))
+                } else {
+                    Result.success(null)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getApp failed for $appId", e)
+            Result.failure(e)
+        }
     }
 
     suspend fun getAllApps(): Result<List<FirestoreApp>> {
@@ -812,6 +845,254 @@ class FirestoreService {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "saveUpdateHistory failed", e)
+            Result.failure(e)
+        }
+    }
+
+    // 15.5. In-App Products Catalog (apps/{appId}/products/{productId} or products/{productId})
+    suspend fun getProduct(appId: String, productId: String): Result<com.avanyx.store.firebase.model.FirestoreProduct?> {
+        return try {
+            if (appId.isNotBlank()) {
+                val subDoc = db.collection(COLLECTION_APPS).document(appId)
+                    .collection("products").document(productId).get().await()
+                if (subDoc.exists()) {
+                    return Result.success(subDoc.toObject(com.avanyx.store.firebase.model.FirestoreProduct::class.java))
+                }
+            }
+            val topDoc = db.collection("products").document(productId).get().await()
+            if (topDoc.exists()) {
+                val prod = topDoc.toObject(com.avanyx.store.firebase.model.FirestoreProduct::class.java)
+                if (prod?.appId == appId || prod?.appId.isNullOrBlank() || appId.isBlank()) {
+                    return Result.success(prod)
+                }
+            }
+            Result.success(null)
+        } catch (e: Exception) {
+            Log.w(TAG, "getProduct notice: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getProductsForApp(appId: String): Result<List<com.avanyx.store.firebase.model.FirestoreProduct>> {
+        return try {
+            val subDocs = db.collection(COLLECTION_APPS).document(appId)
+                .collection("products").whereEqualTo("active", true).get().await()
+            val list = subDocs.toObjects(com.avanyx.store.firebase.model.FirestoreProduct::class.java)
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.w(TAG, "getProductsForApp notice: ${e.message}")
+            Result.success(emptyList())
+        }
+    }
+
+    // 16. AVANYX Pay Purchases Collection (purchases/{purchaseId})
+    suspend fun recordPurchase(purchase: FirestorePurchase): Result<Unit> {
+        return try {
+            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+            if (auth.currentUser == null) {
+                try {
+                    auth.signInAnonymously().await()
+                    Log.d(TAG, "Anonymous auth created for purchase: ${auth.currentUser?.uid}")
+                } catch (ae: Exception) {
+                    Log.w(TAG, "Anonymous auth bypass: ${ae.message}")
+                }
+            }
+            val effectiveUserId = auth.currentUser?.uid ?: purchase.userId.ifBlank { "guest_${java.util.UUID.randomUUID().toString().take(8)}" }
+            val docId = if (purchase.id.isNotBlank()) purchase.id else db.collection(COLLECTION_PURCHASES).document().id
+            val finalPurchase = purchase.copy(
+                id = docId,
+                userId = effectiveUserId
+            )
+            db.collection(COLLECTION_PURCHASES).document(docId).set(finalPurchase, SetOptions.merge()).await()
+            Log.d(TAG, "Firestore write success: purchases/$docId (.set)")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.w(TAG, "recordPurchase sync note (local fallback active): ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getPurchasesForUser(userId: String): Result<List<FirestorePurchase>> {
+        if (userId.isBlank() || userId == "guest_user") {
+            return Result.success(emptyList())
+        }
+        return try {
+            val snapshot = db.collection(COLLECTION_PURCHASES)
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+            val list = snapshot.toObjects(FirestorePurchase::class.java)
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.w(TAG, "getPurchasesForUser notice: ${e.message}")
+            Result.success(emptyList())
+        }
+    }
+
+    fun observePurchasesForUser(userId: String): Flow<List<FirestorePurchase>> = callbackFlow {
+        if (userId.isBlank() || userId == "guest_user") {
+            trySend(emptyList())
+            awaitClose { }
+            return@callbackFlow
+        }
+        val listener = db.collection(COLLECTION_PURCHASES)
+            .whereEqualTo("userId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.d(TAG, "observePurchasesForUser status: ${error.message}")
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val list = snapshot?.toObjects(FirestorePurchase::class.java) ?: emptyList()
+                trySend(list)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // 17. Billing Audits Collection (billing_audits/{auditId})
+    suspend fun recordBillingAudit(audit: FirestoreBillingAudit): Result<Unit> {
+        return try {
+            val docId = if (audit.auditId.isNotBlank()) audit.auditId else db.collection(COLLECTION_BILLING_AUDITS).document().id
+            val finalAudit = audit.copy(auditId = docId)
+            db.collection(COLLECTION_BILLING_AUDITS).document(docId).set(finalAudit, SetOptions.merge()).await()
+            Log.d(TAG, "Firestore write success: billing_audits/$docId (.set)")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "recordBillingAudit failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getBillingAudits(): Result<List<FirestoreBillingAudit>> {
+        return try {
+            val snapshot = db.collection(COLLECTION_BILLING_AUDITS)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get()
+                .await()
+            val list = snapshot.toObjects(FirestoreBillingAudit::class.java)
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.e(TAG, "getBillingAudits failed", e)
+            Result.failure(e)
+        }
+    }
+
+    // 18. Announcements (READ ONLY on Android)
+    suspend fun getAnnouncements(): Result<List<Map<String, Any>>> {
+        return try {
+            val snapshot = db.collection(COLLECTION_ANNOUNCEMENTS).get().await()
+            val list = snapshot.documents.mapNotNull { it.data }
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.e(TAG, "getAnnouncements failed", e)
+            Result.failure(e)
+        }
+    }
+
+    // 19. Rewards (READ ONLY on Android)
+    suspend fun getRewards(): Result<List<com.avanyx.store.firebase.model.FirestoreReward>> {
+        return try {
+            val snapshot = db.collection(COLLECTION_REWARDS).get().await()
+            val list = snapshot.toObjects(com.avanyx.store.firebase.model.FirestoreReward::class.java)
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.e(TAG, "getRewards failed", e)
+            Result.failure(e)
+        }
+    }
+
+    fun observeRewards(): Flow<List<com.avanyx.store.firebase.model.FirestoreReward>> = callbackFlow {
+        val listener = db.collection(COLLECTION_REWARDS)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "observeRewards error", error)
+                    return@addSnapshotListener
+                }
+                val list = snapshot?.toObjects(com.avanyx.store.firebase.model.FirestoreReward::class.java) ?: emptyList()
+                trySend(list)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // 20. Reward History (Android READ user history, Android WRITE new claim)
+    suspend fun getRewardHistory(userId: String): Result<List<com.avanyx.store.firebase.model.FirestoreRewardHistory>> {
+        return try {
+            val snapshot = db.collection(COLLECTION_REWARD_HISTORY)
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+            val list = snapshot.toObjects(com.avanyx.store.firebase.model.FirestoreRewardHistory::class.java)
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.e(TAG, "getRewardHistory failed", e)
+            Result.failure(e)
+        }
+    }
+
+    fun observeRewardHistory(userId: String): Flow<List<com.avanyx.store.firebase.model.FirestoreRewardHistory>> = callbackFlow {
+        val listener = db.collection(COLLECTION_REWARD_HISTORY)
+            .whereEqualTo("userId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "observeRewardHistory error", error)
+                    return@addSnapshotListener
+                }
+                val list = snapshot?.toObjects(com.avanyx.store.firebase.model.FirestoreRewardHistory::class.java) ?: emptyList()
+                trySend(list)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun recordRewardHistory(history: com.avanyx.store.firebase.model.FirestoreRewardHistory): Result<Unit> {
+        return try {
+            val docId = if (history.id.isNotBlank()) history.id else db.collection(COLLECTION_REWARD_HISTORY).document().id
+            val finalObj = history.copy(id = docId)
+            db.collection(COLLECTION_REWARD_HISTORY).document(docId).set(finalObj, SetOptions.merge()).await()
+            Log.d(TAG, "Recorded reward history: $docId")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "recordRewardHistory failed", e)
+            Result.failure(e)
+        }
+    }
+
+    // 21. Purchase Notifications (Android READ user notifications, Android WRITE read status)
+    suspend fun getPurchaseNotifications(userId: String): Result<List<com.avanyx.store.firebase.model.FirestorePurchaseNotification>> {
+        return try {
+            val snapshot = db.collection(COLLECTION_PURCHASE_NOTIFICATIONS)
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+            val list = snapshot.toObjects(com.avanyx.store.firebase.model.FirestorePurchaseNotification::class.java)
+            Result.success(list)
+        } catch (e: Exception) {
+            Log.e(TAG, "getPurchaseNotifications failed", e)
+            Result.failure(e)
+        }
+    }
+
+    fun observePurchaseNotifications(userId: String): Flow<List<com.avanyx.store.firebase.model.FirestorePurchaseNotification>> = callbackFlow {
+        val listener = db.collection(COLLECTION_PURCHASE_NOTIFICATIONS)
+            .whereEqualTo("userId", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "observePurchaseNotifications error", error)
+                    return@addSnapshotListener
+                }
+                val list = snapshot?.toObjects(com.avanyx.store.firebase.model.FirestorePurchaseNotification::class.java) ?: emptyList()
+                trySend(list)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun markPurchaseNotificationAsRead(notifId: String): Result<Unit> {
+        return try {
+            db.collection(COLLECTION_PURCHASE_NOTIFICATIONS).document(notifId)
+                .update("isRead", true)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "markPurchaseNotificationAsRead failed", e)
             Result.failure(e)
         }
     }

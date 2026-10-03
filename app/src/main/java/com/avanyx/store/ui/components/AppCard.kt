@@ -52,6 +52,28 @@ fun AppCard(
     val isWishlisted by wishlistDao.isWishlisted(app.id).collectAsStateWithLifecycle(initialValue = false)
     val appsManager = remember(context) { InstalledAppsManager.getInstance(context) }
 
+    val isBuiltInStoreApp = remember(app.packageName, app.id, app.name, context.packageName) {
+        app.packageName == context.packageName ||
+        app.packageName == "com.avanyx.appstore.dev" ||
+        app.packageName == "com.avanyx.store" ||
+        app.id.equals("avanyx_store", ignoreCase = true) ||
+        app.name.contains("AVANYX Store", ignoreCase = true)
+    }
+
+    val currentAppVersionCode = remember(context) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0).versionCode.toLong()
+            }
+        } catch (_: Exception) {
+            7L
+        }
+    }
+    val hasStoreUpdate = isBuiltInStoreApp && (app.versionCode > currentAppVersionCode)
+
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
@@ -97,20 +119,14 @@ fun AppCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // Developer Name row - Clickable to open Developer Profile
-                val devIdentifier = app.developerUid.ifBlank { app.developer }
+                // Developer Name row - Visible, but NOT clickable per PART E architecture rules
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable {
-                        if (onDeveloperClick != null) {
-                            onDeveloperClick(devIdentifier)
-                        }
-                    }
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = app.developer,
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -161,7 +177,94 @@ fun AppCard(
                 }
             }
 
-            when (actionState) {
+            if (isBuiltInStoreApp) {
+                if (actionState is AppActionState.Update || hasStoreUpdate) {
+                    // Show Update button only when a newer version exists
+                    Button(
+                        onClick = clickHandler,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2563EB),
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .testTag("update_button_${app.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowUpward,
+                            contentDescription = "Update",
+                            modifier = Modifier.size(14.dp).padding(end = 2.dp)
+                        )
+                        Text(
+                            text = "UPDATE",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
+                } else if (actionState is AppActionState.Downloading) {
+                    Button(
+                        onClick = clickHandler,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .testTag("downloading_button_${app.id}")
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { actionState.progress },
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${(actionState.progress * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 11.sp
+                            )
+                        )
+                    }
+                } else {
+                    // Hide Download button & Show Installed badge
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier
+                            .height(36.dp)
+                            .testTag("installed_badge_${app.id}")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(14.dp).padding(end = 4.dp)
+                            )
+                            Text(
+                                text = "INSTALLED",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 11.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+            } else {
+                when (actionState) {
                 is AppActionState.Update -> {
                     // UPDATE -> Blue (Color(0xFF2563EB))
                     Button(
@@ -297,6 +400,7 @@ fun AppCard(
                     }
                 }
             }
+        }
 
             // Three-dot Options Menu for Wishlist, Share, Copy Link, Uninstall
             Box {
@@ -382,8 +486,8 @@ fun AppCard(
                         }
                     )
 
-                    // Uninstall option if installed
-                    if (actionState is AppActionState.Installed || actionState is AppActionState.Update) {
+                    // Uninstall option if installed (strictly hidden for built-in AVANYX Store app)
+                    if (!isBuiltInStoreApp && (actionState is AppActionState.Installed || actionState is AppActionState.Update)) {
                         HorizontalDivider()
                         DropdownMenuItem(
                             text = {

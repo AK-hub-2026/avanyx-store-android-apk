@@ -97,20 +97,25 @@ fun AppsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Apps",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 28.sp,
-                            color = MaterialTheme.colorScheme.onBackground
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = "Apps",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 28.sp,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
                         )
-                    )
-                    Text(
-                        text = "Premium native software curated by AVANYX",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        Text(
+                            text = "Premium native software curated by AVANYX",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Box(
@@ -257,7 +262,7 @@ fun AppsScreen(
                             )
                             onShowMessage("Downloading ${app.name}...")
                         },
-                        onDeveloperClick = onNavigateToDeveloper
+                        onDeveloperClick = null
                     )
                 }
             }

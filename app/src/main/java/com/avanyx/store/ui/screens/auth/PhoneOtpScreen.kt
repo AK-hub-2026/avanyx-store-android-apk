@@ -121,10 +121,11 @@ fun PhoneOtpScreen(
         if (activity != null) {
             authViewModel.sendPhoneOtp(fullInternationalNumber, activity)
         } else {
-            verificationId = "mock_verification_id_123"
-            isTimerRunning = true
-            timerSeconds = 60
-            onShowMessage("OTP verification code sent (Sandbox Mode)")
+            glassError = GlassMessageData(
+                title = "Authentication Error",
+                description = "Unable to find current Activity window to initiate SMS verification.",
+                type = GlassMessageType.ERROR
+            )
         }
     }
 

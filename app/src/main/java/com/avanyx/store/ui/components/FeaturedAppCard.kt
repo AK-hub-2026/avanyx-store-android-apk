@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +37,29 @@ fun FeaturedAppCard(
     onInstallClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val isBuiltInStoreApp = remember(app.packageName, app.id, app.name, context.packageName) {
+        app.packageName == context.packageName ||
+        app.packageName == "com.avanyx.appstore.dev" ||
+        app.packageName == "com.avanyx.store" ||
+        app.id.equals("avanyx_store", ignoreCase = true) ||
+        app.name.contains("AVANYX Store", ignoreCase = true)
+    }
+
+    val currentAppVersionCode = remember(context) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0).versionCode.toLong()
+            }
+        } catch (_: Exception) {
+            7L
+        }
+    }
+    val hasStoreUpdate = isBuiltInStoreApp && (app.versionCode > currentAppVersionCode)
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -93,20 +117,53 @@ fun FeaturedAppCard(
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Install Pill
-                Surface(
-                    onClick = onInstallClick,
-                    shape = RoundedCornerShape(100.dp),
-                    color = Color.White,
-                    contentColor = AvanyxGradientStart,
-                    modifier = Modifier.testTag("featured_install_${app.id}")
-                ) {
-                    Text(
-                        text = "Install",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
-                    )
+                // Action Pill
+                if (isBuiltInStoreApp) {
+                    if (hasStoreUpdate) {
+                        Surface(
+                            onClick = onInstallClick,
+                            shape = RoundedCornerShape(100.dp),
+                            color = Color(0xFF2563EB),
+                            contentColor = Color.White,
+                            modifier = Modifier.testTag("featured_update_${app.id}")
+                        ) {
+                            Text(
+                                text = "Update",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
+                            )
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = Color.White.copy(alpha = 0.25f),
+                            contentColor = Color.White,
+                            modifier = Modifier.testTag("featured_installed_${app.id}")
+                        ) {
+                            Text(
+                                text = "Installed",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Surface(
+                        onClick = onInstallClick,
+                        shape = RoundedCornerShape(100.dp),
+                        color = Color.White,
+                        contentColor = AvanyxGradientStart,
+                        modifier = Modifier.testTag("featured_install_${app.id}")
+                    ) {
+                        Text(
+                            text = "Install",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))

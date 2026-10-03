@@ -38,6 +38,8 @@ data class StoreAppEntity(
     val fullDescription: String = "",
     val featuresJson: String = "",
     val riskScore: String = "LOW",
+    val isPaid: Boolean = false,
+    val price: Double = 0.0,
     val createdDate: Long = System.currentTimeMillis(),
     val updatedDate: Long = System.currentTimeMillis()
 )

@@ -50,7 +50,6 @@ import com.avanyx.store.ui.components.StoreBottomBar
 import com.avanyx.store.ui.screens.AppDetailsScreen
 import com.avanyx.store.ui.screens.AppsScreen
 import com.avanyx.store.ui.screens.DeveloperProfileScreen
-import com.avanyx.store.ui.screens.DownloadsScreen
 import com.avanyx.store.ui.screens.GamesScreen
 import com.avanyx.store.ui.screens.HomeScreen
 import com.avanyx.store.ui.screens.MyAppsScreen
@@ -80,6 +79,9 @@ private const val ROUTE_WISHLIST = "wishlist"
 private const val ROUTE_NOTIFICATIONS = "notifications"
 private const val ROUTE_ABOUT = "about"
 private const val ROUTE_CATEGORIES = "categories"
+private const val ROUTE_STORAGE_CENTER = "storage_center"
+private const val ROUTE_REWARDS = "rewards"
+private const val ROUTE_PURCHASE_HISTORY = "purchase_history"
 
 @Composable
 fun StoreNavigation(
@@ -237,13 +239,6 @@ fun StoreNavigation(
                 )
             }
 
-            composable(ROUTE_DOWNLOADS) {
-                DownloadsScreen(
-                    onBack = { navController.popBackStack() },
-                    onShowMessage = showSnackbar
-                )
-            }
-
             composable(ROUTE_MY_APPS) {
                 MyAppsScreen(
                     onBack = { navController.popBackStack() },
@@ -280,10 +275,42 @@ fun StoreNavigation(
 
             composable(ROUTE_CATEGORIES) {
                 CategoriesScreen(
+                    repository = repository,
                     onBack = { navController.popBackStack() },
                     onCategoryClick = { category ->
                         showSnackbar("Selected Category: $category")
                         navController.popBackStack()
+                    }
+                )
+            }
+
+            composable(ROUTE_STORAGE_CENTER) {
+                com.avanyx.store.ui.screens.StorageCenterScreen(
+                    onBack = { navController.popBackStack() },
+                    onShowMessage = showSnackbar
+                )
+            }
+
+            composable(ROUTE_DOWNLOADS) {
+                com.avanyx.store.ui.screens.StorageCenterScreen(
+                    onBack = { navController.popBackStack() },
+                    onShowMessage = showSnackbar
+                )
+            }
+
+            composable(ROUTE_REWARDS) {
+                com.avanyx.store.ui.screens.RewardsScreen(
+                    onBack = { navController.popBackStack() },
+                    onShowMessage = showSnackbar
+                )
+            }
+
+            composable(ROUTE_PURCHASE_HISTORY) {
+                com.avanyx.store.ui.screens.PurchaseHistoryScreen(
+                    onBack = { navController.popBackStack() },
+                    onShowMessage = showSnackbar,
+                    onNavigateToApp = { appId ->
+                        navController.navigate("app_details/$appId")
                     }
                 )
             }
@@ -421,6 +448,24 @@ fun StoreNavigation(
                     onNavigateToDeveloper = { devId ->
                         val safeId = if (devId.contains(" ")) devId.lowercase().replace(" ", "_") else devId
                         navController.navigate("developer_profile/$safeId")
+                    },
+                    onNavigateToStorageCenter = {
+                        navController.navigate(ROUTE_STORAGE_CENTER)
+                    },
+                    onNavigateToRewards = {
+                        navController.navigate(ROUTE_REWARDS)
+                    },
+                    onNavigateToPurchaseHistory = {
+                        navController.navigate(ROUTE_PURCHASE_HISTORY)
+                    },
+                    onNavigateToCategories = {
+                        navController.navigate(ROUTE_CATEGORIES)
+                    },
+                    onNavigateToNotifications = {
+                        navController.navigate(ROUTE_NOTIFICATIONS)
+                    },
+                    onNavigateToAbout = {
+                        navController.navigate(ROUTE_ABOUT)
                     }
                 )
             }
@@ -723,283 +768,6 @@ private fun SettingsToggleRow(
 }
 
 @Composable
-private fun DownloadsScreen(
-    onBack: () -> Unit,
-    onShowMessage: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val downloadEngine = remember(context) { DownloadManagerEngine.getInstance(context) }
-    val downloadsMap by downloadEngine.downloadsMap.collectAsStateWithLifecycle()
-
-    val activeList = remember(downloadsMap) {
-        downloadsMap.values.filter {
-            it.status == DownloadStatus.DOWNLOADING ||
-                    it.status == DownloadStatus.PAUSED ||
-                    it.status == DownloadStatus.PENDING ||
-                    it.status == DownloadStatus.WAITING ||
-                    it.status == DownloadStatus.RETRYING ||
-                    it.status == DownloadStatus.VERIFYING ||
-                    it.status == DownloadStatus.INSTALLING
-        }
-    }
-
-    val completedList = remember(downloadsMap) {
-        downloadsMap.values.filter { it.status == DownloadStatus.COMPLETED }
-    }
-
-    val failedList = remember(downloadsMap) {
-        downloadsMap.values.filter { it.status == DownloadStatus.FAILED }
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back"
-                )
-            }
-            Text(
-                text = "Downloads & Installs",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.padding(start = 8.dp)
-            )
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                Text(
-                    text = "Active Downloads (${activeList.size})",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            if (activeList.isEmpty()) {
-                item {
-                    Text(
-                        text = "No active downloads currently running.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                items(activeList, key = { it.appId }) { item ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.appName,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
-                                    )
-                                    Text(
-                                        text = when (item.status) {
-                                            DownloadStatus.PAUSED -> "Paused"
-                                            DownloadStatus.VERIFYING -> "Verifying SHA-256..."
-                                            DownloadStatus.INSTALLING -> "Installing Package..."
-                                            else -> "Downloading... ${String.format("%.1f", item.speedKbps)} KB/s"
-                                        },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (item.status == DownloadStatus.PAUSED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Row {
-                                    if (item.status == DownloadStatus.DOWNLOADING) {
-                                        IconButton(onClick = {
-                                            downloadEngine.pauseDownload(item.appId)
-                                            onShowMessage("Download paused")
-                                        }) {
-                                            Icon(imageVector = Icons.Default.Pause, contentDescription = "Pause")
-                                        }
-                                    } else if (item.status == DownloadStatus.PAUSED) {
-                                        IconButton(onClick = {
-                                            downloadEngine.startOrResumeDownload(item.appId, item.appName, "")
-                                            onShowMessage("Download resumed")
-                                        }) {
-                                            Icon(imageVector = Icons.Default.PlayArrow, contentDescription = "Resume")
-                                        }
-                                    }
-                                    IconButton(onClick = {
-                                        downloadEngine.cancelDownload(item.appId)
-                                        onShowMessage("Download canceled")
-                                    }) {
-                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            LinearProgressIndicator(
-                                progress = { item.progress },
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(CircleShape)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "${item.downloadedBytes / 1024 / 1024} MB",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "${(item.progress * 100).toInt()}%",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (failedList.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Failed Downloads (${failedList.size})",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-
-                items(failedList, key = { it.appId }) { item ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = item.appName,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
-                                )
-                                Text(
-                                    text = item.errorMessage ?: "Download failed",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                            Button(
-                                onClick = { downloadEngine.retryDownload(item.appId, item.appName, "") },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            ) {
-                                Text("Retry", fontSize = 12.sp)
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            }
-
-            item {
-                Text(
-                    text = "Completed Queue (${completedList.size})",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            if (completedList.isEmpty()) {
-                item {
-                    Text(
-                        text = "No completed installations yet.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                items(completedList, key = { it.appId }) { item ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Completed",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text(
-                                    text = item.appName,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
-                                )
-                                Text(
-                                    text = "Installed • Verified SHA-256",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        IconButton(onClick = { onShowMessage("Launching ${item.appName}!") }) {
-                            Icon(imageVector = Icons.Default.Apps, contentDescription = "Launch")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private data class CompletedDownloadItem(
-    val name: String,
-    val size: String,
-    val packageName: String
-)
-
-@Composable
 private fun AboutScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -1126,18 +894,16 @@ private fun AboutScreen(
 
 @Composable
 private fun CategoriesScreen(
+    repository: AppRepository,
     onBack: () -> Unit,
     onCategoryClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val categories = listOf(
-        "Casual" to Icons.Default.Games,
-        "Action" to Icons.Default.Warning,
-        "Entertainment" to Icons.Default.PlayArrow,
-        "Productivity" to Icons.Default.Description,
-        "Tools" to Icons.Default.Settings,
-        "Education" to Icons.Default.Info
-    )
+    val apps by repository.getApps().collectAsState(initial = emptyList())
+    val categories = remember(apps) {
+        val appCats = apps.map { it.category.trim() }.filter { it.isNotBlank() }.distinct()
+        if (appCats.isNotEmpty()) appCats else listOf("Games", "Tools", "Productivity", "Education", "Entertainment", "Social")
+    }
 
     Column(
         modifier = modifier
@@ -1171,9 +937,17 @@ private fun CategoriesScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(categories) { item ->
+            items(categories) { categoryName ->
+                val icon = when (categoryName.lowercase()) {
+                    "games", "casual", "action", "arcade", "racing" -> Icons.Default.SportsEsports
+                    "tools", "utility", "utilities" -> Icons.Default.Settings
+                    "productivity" -> Icons.Default.Description
+                    "education" -> Icons.Default.School
+                    "entertainment" -> Icons.Default.PlayArrow
+                    else -> Icons.Default.Category
+                }
                 Card(
-                    onClick = { onCategoryClick(item.first) },
+                    onClick = { onCategoryClick(categoryName) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(110.dp),
@@ -1188,14 +962,14 @@ private fun CategoriesScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = item.second,
-                            contentDescription = item.first,
+                            imageVector = icon,
+                            contentDescription = categoryName,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(32.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = item.first,
+                            text = categoryName,
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onBackground
                         )

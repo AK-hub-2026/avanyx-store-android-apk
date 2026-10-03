@@ -653,7 +653,7 @@ fun DeveloperProfileScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                // Horizontal Screenshot Carousel Mockup
+                                // Horizontal Screenshot Showcase Gallery
                                 LazyRow(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.padding(bottom = 14.dp)

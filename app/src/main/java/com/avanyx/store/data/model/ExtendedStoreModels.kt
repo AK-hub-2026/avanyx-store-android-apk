@@ -54,8 +54,18 @@ data class DownloadInfo(
     val progress: Float = 0f, // Range from 0.0f to 1.0f
     val speedKbps: Float = 0f,
     val errorMessage: String? = null,
-    val checksumSha256: String? = null
-)
+    val checksumSha256: String? = null,
+    val etaSeconds: Int = 0
+) {
+    val etaFormatted: String
+        get() = when {
+            status != DownloadStatus.DOWNLOADING -> ""
+            speedKbps <= 0f -> "Calculating..."
+            etaSeconds <= 0 -> "< 1s"
+            etaSeconds < 60 -> "${etaSeconds}s"
+            else -> "${etaSeconds / 60}m ${etaSeconds % 60}s"
+        }
+}
 
 /**
  * Update metadata containing version comparison details and changelogs.

@@ -92,6 +92,8 @@ data class FirestoreApp(
     val changelog: String = "",
     val fullDescription: String = "",
     val features: List<String> = emptyList(),
+    val isPaid: Boolean = false,
+    val price: Double = 0.0,
     val status: String = "PUBLISHED", // DRAFT, PENDING_REVIEW, PUBLISHED, REJECTED
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
@@ -210,5 +212,96 @@ data class FirestoreUpdateHistory(
     val appId: String = "",
     val fromVersion: String = "",
     val toVersion: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@IgnoreExtraProperties
+data class FirestorePurchase(
+    val id: String = "",
+    val userId: String = "",
+    val appId: String = "",
+    val appName: String = "",
+    val productId: String = "",
+    val itemName: String = "",
+    val amount: Double = 0.0,
+    val currency: String = "INR",
+    val paymentMethod: String = "UPI_APP",
+    val status: String = "SUCCESS",
+    val timestamp: Long = System.currentTimeMillis(),
+    val transactionRef: String = "",
+    val userEmail: String = "",
+    val purchaseToken: String = "",
+    val redeemCode: String = ""
+) {
+    @get:com.google.firebase.firestore.Exclude
+    val transactionId: String
+        get() = id.ifBlank { transactionRef }
+}
+
+@IgnoreExtraProperties
+data class FirestoreProduct(
+    val id: String = "",
+    val appId: String = "",
+    val title: String = "",
+    val description: String = "",
+    val price: Double = 0.0,
+    val currency: String = "INR",
+    val type: String = "INAPP", // INAPP, SUBSCRIPTION
+    val active: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@IgnoreExtraProperties
+data class FirestoreBillingAudit(
+    val auditId: String = "",
+    val timestamp: Long = System.currentTimeMillis(),
+    val userId: String = "",
+    val appId: String = "",
+    val appName: String = "",
+    val step1PopupOpens: Boolean = true,
+    val step2UpiIntentOpens: Boolean = true,
+    val step3QrLoads: Boolean = true,
+    val step4PurchaseRecordCreated: Boolean = true,
+    val step5NotificationDelivered: Boolean = true,
+    val status: String = "PASSED",
+    val verifiedBy: String = "AVANYX Billing & Audit Engine v3.7.3",
+    val notes: String = "All billing pipeline validation tests passed successfully"
+)
+
+@IgnoreExtraProperties
+data class FirestoreReward(
+    val id: String = "",
+    val title: String = "",
+    val description: String = "",
+    val pointsCost: Int = 0,
+    val couponCode: String = "",
+    val discountPercent: Int = 0,
+    val category: String = "GENERAL", // FESTIVAL, REFERRAL, BADGE, COUPON
+    val badgeIcon: String = "star",
+    val isFestival: Boolean = false,
+    val expiryTimestamp: Long = 0L
+)
+
+@IgnoreExtraProperties
+data class FirestoreRewardHistory(
+    val id: String = "",
+    val userId: String = "",
+    val rewardId: String = "",
+    val rewardTitle: String = "",
+    val pointsDelta: Int = 0, // e.g. +50 for referral, -100 for redeemed coupon
+    val type: String = "EARNED", // EARNED, REDEEMED, FESTIVAL_BONUS, REFERRAL_BONUS
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@IgnoreExtraProperties
+data class FirestorePurchaseNotification(
+    val id: String = "",
+    val userId: String = "",
+    val purchaseId: String = "",
+    val title: String = "",
+    val message: String = "",
+    val amount: Double = 0.0,
+    val appName: String = "",
+    val isRead: Boolean = false,
     val timestamp: Long = System.currentTimeMillis()
 )

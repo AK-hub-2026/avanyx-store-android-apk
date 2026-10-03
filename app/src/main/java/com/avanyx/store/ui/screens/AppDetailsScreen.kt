@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
@@ -116,6 +117,45 @@ fun AppDetailsScreen(
     val downloadInfo = downloadsMap[appId]
     val installedApp = remember(installedApps, app) {
         if (app != null) installedApps.find { it.packageName == app.packageName } else null
+    }
+
+    val isBuiltInStoreApp = remember(app?.packageName, app?.id, app?.name, context.packageName) {
+        if (app == null) false else {
+            app.packageName == context.packageName ||
+            app.packageName == "com.avanyx.appstore.dev" ||
+            app.packageName == "com.avanyx.store" ||
+            app.id.equals("avanyx_store", ignoreCase = true) ||
+            app.name.contains("AVANYX Store", ignoreCase = true)
+        }
+    }
+
+    val currentAppVersionCode = remember(context) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 28) {
+                context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0).versionCode.toLong()
+            }
+        } catch (_: Exception) {
+            7L
+        }
+    }
+    val hasStoreUpdate = isBuiltInStoreApp && ((app?.versionCode ?: 0L) > currentAppVersionCode)
+    var showPayDialog by remember { mutableStateOf(false) }
+    var payAmount by remember { mutableDoubleStateOf(99.0) }
+    var payItemName by remember { mutableStateOf("Full License") }
+    var locallyPurchased by remember { mutableStateOf(false) }
+    val firestoreService = remember { com.avanyx.store.firebase.FirestoreService() }
+    val currentUser = remember { com.google.firebase.auth.FirebaseAuth.getInstance().currentUser }
+    val userUid = currentUser?.uid ?: ""
+    val userPurchases by remember(userUid) {
+        if (userUid.isNotBlank()) firestoreService.observePurchasesForUser(userUid)
+        else kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsStateWithLifecycle(initialValue = emptyList())
+    val isPurchased = remember(app?.id, userPurchases, locallyPurchased) {
+        val appId = app?.id ?: ""
+        locallyPurchased || userPurchases.any { it.appId == appId && (it.status.equals("SUCCESS", ignoreCase = true) || it.status.equals("COMPLETED", ignoreCase = true)) }
     }
 
     if (app == null) {
@@ -259,7 +299,16 @@ fun AppDetailsScreen(
                             },
                             modifier = Modifier.testTag("app_menu_copy_link")
                         )
-                        if (installedApp != null) {
+                        DropdownMenuItem(
+                            text = { Text("AVANYX Pay (In-App Purchase)") },
+                            leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                            onClick = {
+                                showTopMenu = false
+                                showPayDialog = true
+                            },
+                            modifier = Modifier.testTag("app_menu_avanyx_pay")
+                        )
+                        if (!isBuiltInStoreApp && installedApp != null) {
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Uninstall App", color = Color(0xFFDC2626), fontWeight = FontWeight.Bold) },
@@ -438,7 +487,7 @@ fun AppDetailsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Downloading... ${(downloadInfo.progress * 100).toInt()}% (${String.format("%.1f", downloadInfo.speedKbps)} KB/s)",
+                                    text = "Downloading... ${(downloadInfo.progress * 100).toInt()}% (${String.format("%.1f", downloadInfo.speedKbps)} KB/s${if (downloadInfo.etaFormatted.isNotBlank()) " • ETA: ${downloadInfo.etaFormatted}" else ""})",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color(0xFF10B981),
                                     fontWeight = FontWeight.Bold
@@ -563,9 +612,77 @@ fun AppDetailsScreen(
                     }
                     else -> {
                         val isInstalled = installedApp != null
-                        val isUpdateAvailable = isInstalled && app.versionCode > (installedApp?.versionCode ?: 0)
+                        val isUpdateAvailable = (isInstalled && app.versionCode > (installedApp?.versionCode ?: 0)) || hasStoreUpdate
 
-                        if (isUpdateAvailable) {
+                        if (isBuiltInStoreApp) {
+                            if (isUpdateAvailable) {
+                                // Show Update button only when a newer version exists
+                                Button(
+                                    onClick = {
+                                        downloadEngine.startOrResumeDownload(
+                                            appId = app.id,
+                                            appName = app.name,
+                                            downloadUrl = app.downloadUrl,
+                                            expectedChecksum = app.checksumSha256
+                                        )
+                                        onShowMessage("Updating ${app.name} to v${app.version}...")
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp)
+                                        .testTag("update_button"),
+                                    shape = RoundedCornerShape(100.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF2563EB),
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowUpward,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp).padding(end = 4.dp)
+                                    )
+                                    Text(
+                                        text = "UPDATE (${app.size})",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 16.sp
+                                        )
+                                    )
+                                }
+                            } else {
+                                // Hide Download button, Hide Uninstall button, Show Installed badge
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp)
+                                        .testTag("store_installed_badge"),
+                                    shape = RoundedCornerShape(100.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Verified,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(20.dp).padding(end = 6.dp)
+                                        )
+                                        Text(
+                                            text = "INSTALLED",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.ExtraBold,
+                                                fontSize = 15.sp,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (isUpdateAvailable) {
                             // UPDATE -> Blue (Color(0xFF2563EB))
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
@@ -690,34 +807,68 @@ fun AppDetailsScreen(
                                 }
                             }
                         } else {
-                            // GET (not installed) -> Green (Color(0xFF10B981))
-                            Button(
-                                onClick = {
-                                    downloadEngine.startOrResumeDownload(
-                                        appId = app.id,
-                                        appName = app.name,
-                                        downloadUrl = app.downloadUrl,
-                                        expectedChecksum = app.checksumSha256
+                            // If paid app and not yet purchased -> AVANYX Pay BUY button
+                            val isPaidApp = app.isPaid || app.price > 0.0
+                            if (isPaidApp && !isPurchased) {
+                                Button(
+                                    onClick = {
+                                        payAmount = if (app.price > 0.0) app.price else 99.0
+                                        payItemName = "${app.name} Full License"
+                                        showPayDialog = true
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp)
+                                        .testTag("buy_button"),
+                                    shape = RoundedCornerShape(100.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF7C3AED),
+                                        contentColor = Color.White
                                     )
-                                    onShowMessage("Starting download for ${app.name}...")
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(52.dp)
-                                    .testTag("install_button"),
-                                shape = RoundedCornerShape(100.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF10B981),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Text(
-                                    text = "GET (${app.size})",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 16.sp
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ShoppingCart,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp).padding(end = 6.dp)
                                     )
-                                )
+                                    Text(
+                                        text = "BUY ₹${if (app.price > 0.0) app.price.toInt() else 99}",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 16.sp
+                                        )
+                                    )
+                                }
+                            } else {
+                                // GET (not installed, free or already purchased) -> Green (Color(0xFF10B981))
+                                Button(
+                                    onClick = {
+                                        downloadEngine.startOrResumeDownload(
+                                            appId = app.id,
+                                            appName = app.name,
+                                            downloadUrl = app.downloadUrl,
+                                            expectedChecksum = app.checksumSha256
+                                        )
+                                        onShowMessage("Starting download for ${app.name}...")
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp)
+                                        .testTag("install_button"),
+                                    shape = RoundedCornerShape(100.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF10B981),
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Text(
+                                        text = "GET (${app.size})",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 16.sp
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
@@ -1359,5 +1510,29 @@ fun AppDetailsScreen(
                 }
             }
         }
+    }
+
+    if (showPayDialog) {
+        com.avanyx.store.ui.components.payment.AvanyxPayBottomSheet(
+            isOpen = showPayDialog,
+            onDismiss = { showPayDialog = false },
+            appId = app.id,
+            appName = app.name,
+            itemName = payItemName,
+            amount = payAmount,
+            appIconUrl = app.iconUrl,
+            onPaymentSuccess = { txn ->
+                locallyPurchased = true
+                showPayDialog = false
+                downloadEngine.startOrResumeDownload(
+                    appId = app.id,
+                    appName = app.name,
+                    downloadUrl = app.downloadUrl,
+                    expectedChecksum = app.checksumSha256
+                )
+                onShowMessage("AVANYX Pay: $payItemName purchased (${txn.transactionId})!")
+            },
+            onShowMessage = onShowMessage
+        )
     }
 }

@@ -398,5 +398,54 @@ service cloud.firestore {
       allow create: if isPrimaryAdmin() || isAdmin();
       allow update, delete: if isPrimaryAdmin() || isAdmin();
     }
+
+    // 23. AVANYX Pay Purchases (Purchase history synced with Firestore)
+    match /purchases/{purchaseId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isPrimaryAdmin() || isAdmin();
+    }
+
+    // 24. Billing Audits (Verification and audit logs)
+    match /billing_audits/{auditId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isPrimaryAdmin() || isAdmin();
+    }
+
+    // 25. Announcements (Android READ ONLY)
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isPrimaryAdmin() || isAdmin();
+    }
+
+    // 26. Rewards Catalog (Android READ ONLY)
+    match /rewards/{rewardId} {
+      allow read: if true;
+      allow write: if isPrimaryAdmin() || isAdmin();
+    }
+
+    // 27. Reward History (Android user READ own and WRITE own claim)
+    match /reward_history/{historyId} {
+      allow read: if isAuthenticated() && (
+        resource == null || resource.data.userId == request.auth.uid || isPrimaryAdmin() || isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid || isPrimaryAdmin() || isAdmin()
+      );
+      allow update, delete: if isPrimaryAdmin() || isAdmin();
+    }
+
+    // 28. Purchase Notifications (Android READ own, WRITE read status update)
+    match /purchase_notifications/{notifId} {
+      allow read: if isAuthenticated() && (
+        resource == null || resource.data.userId == request.auth.uid || isPrimaryAdmin() || isAdmin()
+      );
+      allow create: if isAuthenticated() || isPrimaryAdmin() || isAdmin();
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isPrimaryAdmin() || isAdmin()
+      ) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'status', 'readAt']);
+      allow delete: if isPrimaryAdmin() || isAdmin();
+    }
   }
 }

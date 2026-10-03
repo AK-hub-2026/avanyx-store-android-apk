@@ -24,5 +24,7 @@ data class StoreApp(
     val isFeatured: Boolean = false,
     val packageName: String = "",
     val downloadUrl: String = "",
-    val checksumSha256: String = ""
+    val checksumSha256: String = "",
+    val isPaid: Boolean = false,
+    val price: Double = 0.0
 )

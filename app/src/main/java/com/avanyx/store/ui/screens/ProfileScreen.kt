@@ -39,8 +39,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.avanyx.store.ui.viewmodel.AuthUiState
 import com.avanyx.store.ui.viewmodel.AuthViewModel
-import com.avanyx.store.ui.viewmodel.UploadUiState
-import com.avanyx.store.ui.viewmodel.UploadViewModel
+import com.avanyx.store.data.repository.StorageRepository
+import com.avanyx.store.data.repository.UploadProgressState
+import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
@@ -56,9 +57,14 @@ fun ProfileScreen(
     onNavigateToMyApps: (() -> Unit)? = null,
     onNavigateToWishlist: (() -> Unit)? = null,
     onNavigateToDeveloper: ((String) -> Unit)? = null,
+    onNavigateToStorageCenter: (() -> Unit)? = null,
+    onNavigateToRewards: (() -> Unit)? = null,
+    onNavigateToPurchaseHistory: (() -> Unit)? = null,
+    onNavigateToCategories: (() -> Unit)? = null,
+    onNavigateToNotifications: (() -> Unit)? = null,
+    onNavigateToAbout: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    authViewModel: AuthViewModel = viewModel(),
-    uploadViewModel: UploadViewModel = viewModel()
+    authViewModel: AuthViewModel = viewModel()
 ) {
     val scrollState = rememberScrollState()
     val context = LocalContext.current
@@ -66,7 +72,8 @@ fun ProfileScreen(
     val currentUser by authViewModel.currentUser.collectAsStateWithLifecycle()
     val authUiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val userRole by authViewModel.userRole.collectAsStateWithLifecycle()
-    val uploadUiState by uploadViewModel.uiState.collectAsStateWithLifecycle()
+    val coroutineScope = rememberCoroutineScope()
+    val storageRepository = remember { StorageRepository() }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -87,35 +94,37 @@ fun ProfileScreen(
                     val bytes = outputStream.toByteArray()
                     val fileName = "profile_${currentUser?.uid ?: "user"}_${System.currentTimeMillis()}.jpg"
 
-                    uploadViewModel.uploadDeveloperProfile(
-                        fileBytes = bytes,
-                        fileName = fileName,
-                        mimeType = "image/jpeg"
-                    )
                     onShowMessage("Uploading compressed profile picture...")
+                    coroutineScope.launch {
+                        try {
+                            storageRepository.uploadFileWithProgress(
+                                bucketType = "developer-profile",
+                                fileBytes = bytes,
+                                fileName = fileName,
+                                mimeType = "image/jpeg"
+                            ).collect { progressState ->
+                                when (progressState) {
+                                    is UploadProgressState.Success -> {
+                                        val url = progressState.response.publicUrl
+                                        if (!url.isNull_orEmpty()) {
+                                            authViewModel.updateUserProfile(null, url)
+                                            onShowMessage("Profile picture updated successfully!")
+                                        }
+                                    }
+                                    is UploadProgressState.Error -> {
+                                        onShowMessage("Upload failed: ${progressState.message}")
+                                    }
+                                    else -> {}
+                                }
+                            }
+                        } catch (e: Exception) {
+                            onShowMessage("Upload failed: ${e.message}")
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 onShowMessage("Failed to process selected image: ${e.message}")
             }
-        }
-    }
-
-    // React to upload completion
-    LaunchedEffect(uploadUiState) {
-        when (val state = uploadUiState) {
-            is UploadUiState.Success -> {
-                val url = state.response.publicUrl
-                if (!url.isNull_orEmpty()) {
-                    authViewModel.updateUserProfile(null, url)
-                    onShowMessage("Profile picture updated successfully!")
-                    uploadViewModel.resetState()
-                }
-            }
-            is UploadUiState.Error -> {
-                onShowMessage("Upload failed: ${state.message}")
-                uploadViewModel.resetState()
-            }
-            else -> {}
         }
     }
 
@@ -425,12 +434,32 @@ fun ProfileScreen(
             )
 
             ProfileOptionRow(
-                icon = Icons.Default.CloudDownload,
-                title = "Downloads & Storage",
-                subtitle = "Manage cached APK packages and background tasks",
+                icon = Icons.Default.Storage,
+                title = "Storage & Downloads",
+                subtitle = "App storage usage, APK footprint, and cache cleaner",
                 onClick = {
-                    if (onNavigateToDownloads != null) onNavigateToDownloads()
-                    else onShowMessage("Opening Downloads...")
+                    if (onNavigateToStorageCenter != null) onNavigateToStorageCenter()
+                    else onShowMessage("Opening Storage & Downloads...")
+                }
+            )
+
+            ProfileOptionRow(
+                icon = Icons.Default.CardGiftcard,
+                title = "Rewards Center",
+                subtitle = "Points, festival coupons, referral bonuses & badges",
+                onClick = {
+                    if (onNavigateToRewards != null) onNavigateToRewards()
+                    else onShowMessage("Opening Rewards Center...")
+                }
+            )
+
+            ProfileOptionRow(
+                icon = Icons.Default.ReceiptLong,
+                title = "Purchase History",
+                subtitle = "Live orders, receipts and digital licenses",
+                onClick = {
+                    if (onNavigateToPurchaseHistory != null) onNavigateToPurchaseHistory()
+                    else onShowMessage("Opening Purchase History...")
                 }
             )
 
@@ -451,6 +480,46 @@ fun ProfileScreen(
                 onClick = {
                     if (onNavigateToWishlist != null) onNavigateToWishlist()
                     else onShowMessage("Opening Wishlist...")
+                }
+            )
+
+            ProfileOptionRow(
+                icon = Icons.Default.Category,
+                title = "Browse Categories",
+                subtitle = "Explore curated categories and software departments",
+                onClick = {
+                    if (onNavigateToCategories != null) onNavigateToCategories()
+                    else onShowMessage("Opening Categories...")
+                }
+            )
+
+            ProfileOptionRow(
+                icon = Icons.Default.Notifications,
+                title = "Notification Center",
+                subtitle = "System updates, security alerts, and receipts",
+                onClick = {
+                    if (onNavigateToNotifications != null) onNavigateToNotifications()
+                    else onShowMessage("Opening Notifications...")
+                }
+            )
+
+            ProfileOptionRow(
+                icon = Icons.Default.Settings,
+                title = "Settings & Preferences",
+                subtitle = "Theme, auto-updates, download network and storage cache",
+                onClick = {
+                    if (onNavigateToSettings != null) onNavigateToSettings()
+                    else onShowMessage("Opening Settings...")
+                }
+            )
+
+            ProfileOptionRow(
+                icon = Icons.Default.Info,
+                title = "About AVANYX Store",
+                subtitle = "App version, technical architecture, and legal specs",
+                onClick = {
+                    if (onNavigateToAbout != null) onNavigateToAbout()
+                    else onShowMessage("Opening About...")
                 }
             )
 

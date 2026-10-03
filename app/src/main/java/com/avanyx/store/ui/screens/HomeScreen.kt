@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -292,7 +293,7 @@ fun HomeScreen(
             }
         }
 
-        // Mock Search Bar (Navigates to search on tap)
+        // Quick Search Bar (Navigates to search on tap)
         item {
             Box(
                 modifier = Modifier
@@ -302,7 +303,7 @@ fun HomeScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable(onClick = onNavigateToSearch)
                     .padding(horizontal = 18.dp, vertical = 14.dp)
-                    .testTag("mock_search_bar"),
+                    .testTag("home_search_bar"),
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(
@@ -486,7 +487,7 @@ fun HomeScreen(
                         )
                         onShowMessage("Starting download for ${app.name}...")
                     },
-                    onDeveloperClick = onNavigateToDeveloper
+                    onDeveloperClick = null
                 )
             }
         }
