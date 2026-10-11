@@ -37,6 +37,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import com.avanyx.store.ui.components.AppIconView
 import com.avanyx.store.data.model.DeveloperInfo
 import com.avanyx.store.data.model.StoreApp
 import com.avanyx.store.data.repository.AppRepository
@@ -285,8 +290,8 @@ fun DeveloperProfileScreen(
                 ) {
                     // Banner Image / Gradient
                     if (!developerInfo.bannerUrl.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = developerInfo.bannerUrl,
+                        com.avanyx.store.ui.components.StoreImageView(
+                            urlOrData = developerInfo.bannerUrl.orEmpty(),
                             contentDescription = "Developer Banner",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
@@ -335,31 +340,59 @@ fun DeveloperProfileScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         // Logo Avatar
+                        val devLogoTarget = remember(developerInfo.logoUrl, developerInfo.avatarUrl) {
+                            val logo = developerInfo.logoUrl.orEmpty()
+                            val avatar = developerInfo.avatarUrl.orEmpty()
+                            if (logo.isNotBlank()) logo else avatar
+                        }
+                        val devBitmap = remember(devLogoTarget) {
+                            if (devLogoTarget.startsWith("data:image") || devLogoTarget.startsWith("data:application")) {
+                                try {
+                                    val base64Data = devLogoTarget.substringAfter("base64,")
+                                    val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
+                                    BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            } else null
+                        }
+
                         Surface(
                             shape = CircleShape,
                             shadowElevation = 6.dp,
                             border = BorderStroke(3.dp, MaterialTheme.colorScheme.surface),
                             modifier = Modifier.size(80.dp)
                         ) {
-                            if (!developerInfo.logoUrl.isNullOrEmpty()) {
-                                AsyncImage(
-                                    model = developerInfo.logoUrl,
-                                    contentDescription = "Developer Logo",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = developerInfo.name.take(2).uppercase(),
-                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                            when {
+                                devBitmap != null -> {
+                                    Image(
+                                        bitmap = devBitmap.asImageBitmap(),
+                                        contentDescription = "Developer Logo",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
                                     )
+                                }
+                                devLogoTarget.startsWith("http") -> {
+                                    AsyncImage(
+                                        model = devLogoTarget,
+                                        contentDescription = "Developer Logo",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                else -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = developerInfo.name.take(2).uppercase(),
+                                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -653,34 +686,48 @@ fun DeveloperProfileScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                // Horizontal Screenshot Showcase Gallery
+                                // Real Horizontal Screenshot Showcase Gallery
+                                val featuredScreenshots = remember(featuredApp) {
+                                    val list = featuredApp.screenshots.filter { it.isNotBlank() }
+                                    val defaultGallery = listOf(
+                                        "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+                                        "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80",
+                                        "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&auto=format&fit=crop&q=80"
+                                    )
+                                    when {
+                                        list.size >= 2 -> list
+                                        list.size == 1 -> {
+                                            val first = list.first()
+                                            if (featuredApp.bannerUrl.isNotBlank() && featuredApp.bannerUrl != first) {
+                                                listOf(first, featuredApp.bannerUrl) + defaultGallery.take(1)
+                                            } else {
+                                                listOf(first) + defaultGallery.take(2)
+                                            }
+                                        }
+                                        featuredApp.bannerUrl.isNotBlank() -> listOf(featuredApp.bannerUrl) + defaultGallery.take(2)
+                                        else -> defaultGallery
+                                    }
+                                }
+
                                 LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.padding(bottom = 14.dp)
                                 ) {
-                                    items(3) { index ->
-                                        Box(
+                                    items(featuredScreenshots) { screenshotUrl ->
+                                        Card(
+                                            shape = RoundedCornerShape(14.dp),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
                                             modifier = Modifier
                                                 .width(140.dp)
-                                                .height(200.dp)
-                                                .clip(RoundedCornerShape(14.dp))
-                                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                                            contentAlignment = Alignment.Center
+                                                .height(210.dp)
+                                                .clickable { onAppClick(featuredApp.id) }
                                         ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Smartphone,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(36.dp)
-                                                )
-                                                Spacer(modifier = Modifier.height(6.dp))
-                                                Text(
-                                                    text = "Preview ${index + 1}",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                                )
-                                            }
+                                            com.avanyx.store.ui.components.StoreImageView(
+                                                urlOrData = screenshotUrl,
+                                                contentDescription = "${featuredApp.name} screenshot",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
                                         }
                                     }
                                 }
@@ -690,26 +737,13 @@ fun DeveloperProfileScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    // App Icon Box
-                                    Box(
-                                        modifier = Modifier
-                                            .size(52.dp)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(
-                                                try {
-                                                    Color(android.graphics.Color.parseColor(featuredApp.iconBgColorHex))
-                                                } catch (e: Exception) {
-                                                    MaterialTheme.colorScheme.primary
-                                                }
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = featuredApp.iconText,
-                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                            color = Color.White
-                                        )
-                                    }
+                                    // Real App Icon / Live Logo
+                                    AppIconView(
+                                        app = featuredApp,
+                                        size = 56.dp,
+                                        cornerRadius = 14.dp,
+                                        fontSize = 20.sp
+                                    )
 
                                     Spacer(modifier = Modifier.width(12.dp))
 

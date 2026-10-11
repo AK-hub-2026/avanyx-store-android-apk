@@ -53,7 +53,7 @@ import kotlinx.coroutines.launch
         AppUpdateEntity::class,
         AppReviewEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -11,6 +11,7 @@ data class StoreApp(
     val iconBgColorHex: String,
     val iconUrl: String = "",
     val logoUrl: String = "",
+    val bannerUrl: String = "",
     val screenshots: List<String> = emptyList(),
     val version: String,
     val versionCode: Long = 1L,

@@ -1,9 +1,12 @@
 package com.avanyx.store.ui.components
 
+import android.graphics.BitmapFactory
 import android.graphics.drawable.Drawable
+import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -67,14 +71,26 @@ fun AppIconView(
 ) {
     val context = LocalContext.current
     val imageTarget = when {
-        iconUrl.isNotBlank() -> iconUrl
-        logoUrl.isNotBlank() -> logoUrl
+        iconUrl.isNotBlank() -> iconUrl.trim()
+        logoUrl.isNotBlank() -> logoUrl.trim()
         else -> null
     }
 
     val isAvanyxStore = appId.contains("avanyx", ignoreCase = true) ||
             appName.contains("AVANYX Store", ignoreCase = true) ||
             appName.equals("AVANYX", ignoreCase = true)
+
+    val decodedBitmap = remember(imageTarget) {
+        if (imageTarget != null && (imageTarget.startsWith("data:image") || imageTarget.startsWith("data:application"))) {
+            try {
+                val base64Data = imageTarget.substringAfter("base64,")
+                val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
+                BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+    }
 
     val bgColor = try {
         Color(android.graphics.Color.parseColor(iconBgColorHex.ifBlank { "#6750A4" }))
@@ -89,35 +105,47 @@ fun AppIconView(
             .background(bgColor),
         contentAlignment = Alignment.Center
     ) {
-        if (imageTarget != null && imageTarget.startsWith("http")) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(imageTarget)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = "$appName icon",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(size)
-            )
-        } else if (isAvanyxStore) {
-            Image(
-                painter = painterResource(id = R.drawable.avanyx_logo),
-                contentDescription = "AVANYX Store Logo",
-                modifier = Modifier.size(size)
-            )
-        } else {
-            val label = when {
-                iconText.isNotBlank() -> iconText
-                appName.length >= 2 -> appName.take(2).uppercase()
-                appName.isNotEmpty() -> appName.uppercase()
-                else -> "AV"
+        when {
+            decodedBitmap != null -> {
+                Image(
+                    bitmap = decodedBitmap.asImageBitmap(),
+                    contentDescription = "$appName icon",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
-            Text(
-                text = label,
-                color = Color.White,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = fontSize
-            )
+            imageTarget != null && imageTarget.startsWith("http") -> {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(imageTarget)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "$appName icon",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            isAvanyxStore -> {
+                Image(
+                    painter = painterResource(id = R.drawable.avanyx_logo),
+                    contentDescription = "AVANYX Store Logo",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            else -> {
+                val label = when {
+                    iconText.isNotBlank() -> iconText
+                    appName.length >= 2 -> appName.take(2).uppercase()
+                    appName.isNotEmpty() -> appName.uppercase()
+                    else -> "AV"
+                }
+                Text(
+                    text = label,
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = fontSize
+                )
+            }
         }
     }
 }

@@ -1,0 +1,8 @@
+Contact: mailto:security@avanyx.io
+Contact: https://avanyxstore.org/#contact
+Expires: 2027-12-31T23:59:59.000Z
+Encryption: https://avanyxstore.org/pgp-key.txt
+Preferred-Languages: en
+Canonical: https://avanyxstore.org/.well-known/security.txt
+Policy: https://avanyxstore.org/#security-privacy
+Hiring: https://avanyxstore.org/careers

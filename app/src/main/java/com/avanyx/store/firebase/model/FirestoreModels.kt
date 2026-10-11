@@ -79,6 +79,7 @@ data class FirestoreApp(
     val iconBgColorHex: String = "#6750A4",
     val iconUrl: String = "",
     val logoUrl: String = "",
+    val bannerUrl: String = "",
     val screenshots: List<String> = emptyList(),
     val sizeMb: String = "0 MB",
     val rating: Double = 0.0,
@@ -202,7 +203,15 @@ data class FirestoreFeaturedBanner(
     val title: String = "",
     val subtitle: String = "",
     val imageUrl: String = "",
-    val targetAppId: String = ""
+    val bannerImageUrl: String = "",
+    val targetAppId: String = "",
+    val targetType: String = "APP",
+    val badgeText: String = "FEATURED",
+    val displayOrder: Int = 0,
+    val order: Int = 0,
+    val gradient: String = "from-[#1E142F] to-[#12131C]",
+    val ctaText: String = "View App",
+    val isActive: Boolean = true
 )
 
 @IgnoreExtraProperties

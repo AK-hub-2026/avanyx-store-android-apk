@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -305,6 +306,7 @@ class FirestoreRepository(
             iconBgColorHex = if (iconBgColorHex.isNotBlank()) iconBgColorHex else "#6750A4",
             iconUrl = iconUrl,
             logoUrl = logoUrl,
+            bannerUrl = bannerUrl,
             developerUid = developerUid,
             screenshotsJson = com.avanyx.store.data.database.Converters().fromListToString(screenshots),
             sizeMb = if (sizeMb.isNotBlank()) (if (sizeMb.contains("MB", ignoreCase = true) || sizeMb.contains("GB", ignoreCase = true) || sizeMb.contains("KB", ignoreCase = true)) sizeMb else "$sizeMb MB") else "25 MB",
@@ -469,6 +471,13 @@ class FirestoreRepository(
             Result.failure(e)
         }
     }
+
+    // 7. Featured Banners
+    fun observeFeaturedBanners(): Flow<List<com.avanyx.store.firebase.model.FirestoreFeaturedBanner>> =
+        firestoreService.observeFeaturedBanners()
+
+    suspend fun getFeaturedBanners(): List<com.avanyx.store.firebase.model.FirestoreFeaturedBanner> =
+        firestoreService.getFeaturedBanners().getOrElse { emptyList() }
 
     private fun nameFallback(name: String) = if (name.isBlank()) "App" else name
 }

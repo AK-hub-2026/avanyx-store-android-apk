@@ -24,6 +24,7 @@ data class StoreAppEntity(
     val iconText: String = "APP",
     val iconUrl: String = "",
     val logoUrl: String = "",
+    val bannerUrl: String = "",
     val screenshotsJson: String = "",
     val sizeMb: String = "15 MB",
     val rating: Double = 4.5,

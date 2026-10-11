@@ -1,0 +1,501 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "AVANYX Store user profile with role, verified status, and security permissions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "bio": { "type": "string" },
+        "role": { "type": "string", "enum": ["USER", "DEVELOPER", "STUDENT", "ADMIN"] },
+        "developerStatus": { "type": "string", "enum": ["NONE", "PENDING", "VERIFIED", "REJECTED", "SUSPENDED"] },
+        "studentStatus": { "type": "string", "enum": ["NONE", "PENDING", "VERIFIED", "REJECTED"] },
+        "adminStatus": { "type": "string", "enum": ["NONE", "ACTIVE", "SUSPENDED"] },
+        "verificationBadge": { "type": "string", "enum": ["NONE", "VERIFIED", "OFFICIAL", "STUDENT_VERIFIED"] },
+        "developerKey": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "SUSPENDED", "DISABLED"] },
+        "phoneVerified": { "type": "boolean" },
+        "verifiedPhone": { "type": "string" },
+        "phoneVerifiedAt": { "type": "string" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "App": {
+      "title": "App",
+      "description": "Store application item verified and published or under moderation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "developer": { "type": "string" },
+        "developerUid": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["PUBLISHED", "PENDING_REVIEW", "REJECTED", "ARCHIVED"] },
+        "packageName": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "checksumSha256": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "required": ["id", "name", "developerUid", "status"]
+    },
+    "DeveloperRequest": {
+      "title": "DeveloperRequest",
+      "description": "Developer verification request for publishing applications with 18+ age verification.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "fullLegalName": { "type": "string" },
+        "organizationName": { "type": "string" },
+        "dob": { "type": "string" },
+        "country": { "type": "string" },
+        "state": { "type": "string" },
+        "websiteUrl": { "type": "string" },
+        "githubUrl": { "type": "string" },
+        "supportEmail": { "type": "string" },
+        "emailVerified": { "type": "boolean" },
+        "description": { "type": "string" },
+        "profileLogoUrl": { "type": "string" },
+        "bannerUrl": { "type": "string" },
+        "aadhaarMasked": { "type": "string" },
+        "panNumber": { "type": "string" },
+        "agreeTerms": { "type": "boolean" },
+        "agreePrivacy": { "type": "boolean" },
+        "confirmOwnership": { "type": "boolean" },
+        "phoneVerified": { "type": "boolean" },
+        "verifiedPhone": { "type": "string" },
+        "phoneVerifiedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED"] },
+        "reviewedAt": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "reviewerNotes": { "type": "string" }
+      },
+      "required": ["userId", "status"]
+    },
+    "StudentRequest": {
+      "title": "StudentRequest",
+      "description": "Student verification request for Class 10 passed student publishers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "fullName": { "type": "string" },
+        "dob": { "type": "string" },
+        "aadhaarMasked": { "type": "string" },
+        "institutionName": { "type": "string" },
+        "board": { "type": "string" },
+        "boardOther": { "type": "string" },
+        "passingYear": { "type": "string" },
+        "studentIdNumber": { "type": "string" },
+        "documentUrl": { "type": "string" },
+        "studentEmail": { "type": "string" },
+        "emailVerified": { "type": "boolean" },
+        "bio": { "type": "string" },
+        "isUnder18": { "type": "boolean" },
+        "canMonetize": { "type": "boolean" },
+        "phoneVerified": { "type": "boolean" },
+        "verifiedPhone": { "type": "string" },
+        "phoneVerifiedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "PENDING_REVIEW", "APPROVED", "REJECTED"] },
+        "reviewedAt": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "reviewerNotes": { "type": "string" }
+      },
+      "required": ["userId", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security log of administrative actions and role updates.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "adminUid": { "type": "string" },
+        "adminEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "targetId": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["action", "targetId"]
+    },
+    "AppReview": {
+      "title": "AppReview",
+      "description": "User review and rating for an application on AVANYX Store.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "appId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatarUrl": { "type": "string" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "title": { "type": "string" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "developerReply": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "repliedAt": { "type": "string" },
+            "developerUid": { "type": "string" }
+          }
+        }
+      },
+      "required": ["appId", "userId", "rating", "comment"]
+    },
+    "AppRating": {
+      "title": "AppRating",
+      "description": "User rating entry (1 to 5 stars) for an application.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "appId": { "type": "string" },
+        "userId": { "type": "string" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["appId", "userId", "rating"]
+    },
+    "AppDownload": {
+      "title": "AppDownload",
+      "description": "Recorded APK download event for metrics and analytics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "appId": { "type": "string" },
+        "appName": { "type": "string" },
+        "developerUid": { "type": "string" },
+        "userId": { "type": "string" },
+        "version": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["appId", "timestamp"]
+    },
+    "Developer": {
+      "title": "Developer",
+      "description": "Public developer brand profile with verification badge.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "organizationName": { "type": "string" },
+        "verified": { "type": "boolean" },
+        "verificationBadge": { "type": "string" },
+        "officialWebsite": { "type": "string" },
+        "githubUrl": { "type": "string" },
+        "bio": { "type": "string" }
+      },
+      "required": ["id", "displayName"]
+    },
+    "UserDeviceSession": {
+      "title": "UserDeviceSession",
+      "description": "User active device sessions with privacy protection.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "deviceName": { "type": "string" },
+        "platform": { "type": "string" },
+        "browser": { "type": "string" },
+        "androidVersion": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "location": { "type": "string" },
+        "isCurrentSession": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "lastActiveAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "REVOKED", "EXPIRED"] }
+      },
+      "required": ["userId", "deviceName", "status"]
+    },
+    "ConnectedApp": {
+      "title": "ConnectedApp",
+      "description": "AVANYX ecosystem application connected to the user account.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["CONNECTED", "AUTHORIZED", "REVOKED"] },
+        "authorizedScopes": { "type": "array", "items": { "type": "string" } },
+        "connectedAt": { "type": "string" },
+        "lastAccessedAt": { "type": "string" }
+      },
+      "required": ["userId", "clientId", "name", "status"]
+    },
+    "OAuthClient": {
+      "title": "OAuthClient",
+      "description": "OAuth 2.0 / OIDC client registered by identity administrators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientSecretHint": { "type": "string" },
+        "description": { "type": "string" },
+        "homepageUrl": { "type": "string" },
+        "redirectUris": { "type": "array", "items": { "type": "string" } },
+        "callbackUrls": { "type": "array", "items": { "type": "string" } },
+        "allowedOrigins": { "type": "array", "items": { "type": "string" } },
+        "allowedScopes": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["ACTIVE", "REVOKED", "SUSPENDED"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["clientId", "clientName", "status"]
+    },
+    "UploadedFile": {
+      "title": "UploadedFile",
+      "description": "Metadata record for public store assets and private verification documents.",
+      "type": "object",
+      "properties": {
+        "fileId": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "uploadedByUid": { "type": "string" },
+        "applicationToken": { "type": "string" },
+        "fileType": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "sanitizedName": { "type": "string" },
+        "fileSizeBytes": { "type": "number" },
+        "mimeType": { "type": "string" },
+        "folder": { "type": "string" },
+        "isPrivate": { "type": "boolean" },
+        "uploadedAt": { "type": "string" }
+      },
+      "required": ["fileId", "ownerUid", "fileType", "storagePath", "isPrivate"]
+    },
+    "OtpRateLimit": {
+      "title": "OtpRateLimit",
+      "description": "Daily OTP request rate limiter and verification records.",
+      "type": "object",
+      "properties": {
+        "phoneNumber": { "type": "string" },
+        "count": { "type": "number" },
+        "lastResetDate": { "type": "string" },
+        "phoneVerified": { "type": "boolean" },
+        "verifiedPhone": { "type": "string" },
+        "phoneVerifiedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["phoneNumber", "count", "lastResetDate"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "In-App Product or Subscription plan published with immutable productId.",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["IN_APP", "SUBSCRIPTION"] },
+        "price": { "type": "number" },
+        "appId": { "type": "string" },
+        "appName": { "type": "string" },
+        "developerUid": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "ARCHIVED"] }
+      },
+      "required": ["productId", "name", "price", "appId", "developerUid", "status"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "AVANYX Billing live purchase transaction record.",
+      "type": "object",
+      "properties": {
+        "purchaseToken": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "productType": { "type": "string", "enum": ["IN_APP", "SUBSCRIPTION"] },
+        "appId": { "type": "string" },
+        "appName": { "type": "string" },
+        "developerUid": { "type": "string" },
+        "userUid": { "type": "string" },
+        "amount": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["SUCCESS", "PENDING_VERIFICATION", "FAILED", "CANCELLED"] },
+        "utr": { "type": "string" },
+        "paymentScreenshotUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["purchaseToken", "productId", "appId", "developerUid", "userUid", "amount", "paymentStatus", "utr", "paymentScreenshotUrl"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Active or expired recurring subscription instance.",
+      "type": "object",
+      "properties": {
+        "subscriptionId": { "type": "string" },
+        "planId": { "type": "string" },
+        "productId": { "type": "string" },
+        "appId": { "type": "string" },
+        "developerUid": { "type": "string" },
+        "userUid": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "EXPIRED", "CANCELLED", "PENDING_VERIFICATION"] },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" }
+      },
+      "required": ["subscriptionId", "productId", "appId", "developerUid", "userUid", "status"]
+    },
+    "PurchaseNotification": {
+      "title": "PurchaseNotification",
+      "description": "Customer notification alert for billing status changes.",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string" },
+        "purchaseToken": { "type": "string" },
+        "productId": { "type": "string" },
+        "status": { "type": "string" },
+        "message": { "type": "string" },
+        "isRead": { "type": "boolean" }
+      },
+      "required": ["userUid", "purchaseToken", "status", "message"]
+    },
+    "SubscriptionPlan": {
+      "title": "SubscriptionPlan",
+      "description": "Configurable recurring subscription plan published for an app.",
+      "type": "object",
+      "properties": {
+        "planId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "appId": { "type": "string" },
+        "developerUid": { "type": "string" },
+        "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "LIFETIME"] },
+        "price": { "type": "number" },
+        "trialDays": { "type": "number" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "ARCHIVED"] }
+      },
+      "required": ["planId", "name", "appId", "developerUid", "billingCycle", "price", "status"]
+    },
+    "DeveloperPayout": {
+      "title": "DeveloperPayout",
+      "description": "Developer payout withdrawal request and settlement status.",
+      "type": "object",
+      "properties": {
+        "payoutId": { "type": "string" },
+        "developerUid": { "type": "string" },
+        "developerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "payoutMethod": { "type": "string", "enum": ["UPI", "BANK_TRANSFER"] },
+        "upiId": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "PROCESSING", "PAID", "REJECTED"] },
+        "requestedAt": { "type": "string" }
+      },
+      "required": ["payoutId", "developerUid", "amount", "payoutMethod", "status", "requestedAt"]
+    },
+    "DeveloperPayoutSetting": {
+      "title": "DeveloperPayoutSetting",
+      "description": "Developer stored payout payment credentials (UPI or Bank account).",
+      "type": "object",
+      "properties": {
+        "developerUid": { "type": "string" },
+        "payoutMethod": { "type": "string", "enum": ["UPI", "BANK_TRANSFER"] },
+        "upiId": { "type": "string" },
+        "bankAccountNumber": { "type": "string" },
+        "bankIfsc": { "type": "string" }
+      },
+      "required": ["developerUid", "payoutMethod"]
+    }
+  },
+  "firestore": {
+    "/otp_rate_limits/{phoneId}": {
+      "schema": { "$ref": "#/entities/OtpRateLimit" },
+      "description": "Daily mobile SMS OTP rate limits and phone verification status"
+    },
+    "/developer_verifications/{userId}": {
+      "schema": { "$ref": "#/entities/DeveloperRequest" },
+      "description": "Live developer verification applications with mandatory phone OTP verification"
+    },
+    "/student_verifications/{userId}": {
+      "schema": { "$ref": "#/entities/StudentRequest" },
+      "description": "Live student publisher verification applications with mandatory phone OTP verification"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles with authoritative roles and security statuses"
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/UserDeviceSession" },
+      "description": "User active device sessions protected with user-only RBAC"
+    },
+    "/connected_apps/{appId}": {
+      "schema": { "$ref": "#/entities/ConnectedApp" },
+      "description": "Authorized AVANYX ecosystem applications per user"
+    },
+    "/oauth_clients/{clientId}": {
+      "schema": { "$ref": "#/entities/OAuthClient" },
+      "description": "Identity OAuth 2.0 / OIDC application clients (Admin managed)"
+    },
+    "/apps/{appId}": {
+      "schema": { "$ref": "#/entities/App" },
+      "description": "Store applications catalog"
+    },
+    "/developers/{developerId}": {
+      "schema": { "$ref": "#/entities/Developer" },
+      "description": "Public developer brand profiles"
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/AppReview" },
+      "description": "Application reviews and ratings submitted by users"
+    },
+    "/ratings/{ratingId}": {
+      "schema": { "$ref": "#/entities/AppRating" },
+      "description": "Individual application ratings by user"
+    },
+    "/downloads/{downloadId}": {
+      "schema": { "$ref": "#/entities/AppDownload" },
+      "description": "Real application download telemetry and counter logs"
+    },
+    "/developer_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/DeveloperRequest" },
+      "description": "Developer verification queue applications"
+    },
+    "/student_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/StudentRequest" },
+      "description": "Student verification queue applications"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Security audit logs for admin actions"
+    },
+    "/uploaded_files/{fileId}": {
+      "schema": { "$ref": "#/entities/UploadedFile" },
+      "description": "Private verification files and public asset storage metadata"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "In-App products and subscription plans published with immutable productId"
+    },
+    "/purchases/{purchaseId}": {
+      "schema": { "$ref": "#/entities/Purchase" },
+      "description": "Live purchase transactions generated by AVANYX Billing API"
+    },
+    "/subscriptions/{subId}": {
+      "schema": { "$ref": "#/entities/Subscription" },
+      "description": "Customer recurring subscription instances"
+    },
+    "/purchase_notifications/{notifId}": {
+      "schema": { "$ref": "#/entities/PurchaseNotification" },
+      "description": "Billing updates and transaction alerts"
+    },
+    "/subscription_plans/{planId}": {
+      "schema": { "$ref": "#/entities/SubscriptionPlan" },
+      "description": "Recurring subscription plans published by developers"
+    },
+    "/developer_payouts/{payoutId}": {
+      "schema": { "$ref": "#/entities/DeveloperPayout" },
+      "description": "Developer payout withdrawal requests and transaction settlement"
+    },
+    "/payout_settings/{developerUid}": {
+      "schema": { "$ref": "#/entities/DeveloperPayoutSetting" },
+      "description": "Developer saved payout settlement destination (UPI or Bank account)"
+    }
+  }
+}

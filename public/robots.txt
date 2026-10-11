@@ -1,0 +1,55 @@
+# AVANYX Store Robots.txt
+# Optimized for Google, Bing, Gemini, ChatGPT, Perplexity, Claude & AI Crawlers
+
+User-agent: *
+Allow: /
+Allow: /intro
+Allow: /store
+Allow: /developer-console
+Allow: /student-console
+Allow: /about
+Allow: /faq
+Allow: /apps
+Allow: /games
+Allow: /app/
+Allow: /developer/apply
+Allow: /student/apply
+Allow: /developer-profile/
+Allow: /login
+Allow: /signup
+Allow: /sitemap.xml
+
+# Disallow private user accounts and admin console areas
+Disallow: /admin
+Disallow: /admin-console
+Disallow: /developer/console
+Disallow: /student/console
+Disallow: /account
+Disallow: /profile
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /identity/admin
+
+# AI Search Engine Crawlers Explicit Permissions
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+Sitemap: https://avanyxstore.org/sitemap.xml

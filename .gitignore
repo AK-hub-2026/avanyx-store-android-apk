@@ -10,8 +10,6 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
-app/build
-.build-outputs
 /captures
 .externalNativeBuild
 .cxx
@@ -21,3 +19,12 @@ debug.keystore
 *.jks
 *.keystore
 *.base64
+node_modules
+dist
+.npm
+
+# Private verification files (isolated from git commits & GitHub Pages)
+/private/*
+!/private/verification/aadhaar/.gitkeep
+!/private/verification/selfie/.gitkeep
+!/private/verification/documents/.gitkeep

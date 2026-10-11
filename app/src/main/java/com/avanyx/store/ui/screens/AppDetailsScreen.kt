@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Star
@@ -50,6 +52,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -60,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import com.avanyx.store.data.model.StoreApp
 import com.avanyx.store.data.model.AppActionState
 import com.avanyx.store.data.model.DownloadStatus
 import com.avanyx.store.data.repository.AppRepository
@@ -78,7 +82,69 @@ fun AppDetailsScreen(
 ) {
     val context = LocalContext.current
     val allApps by repository.getApps().collectAsStateWithLifecycle(initialValue = emptyList())
-    val app = remember(allApps, appId) { allApps.find { it.id == appId } ?: repository.getAppById(appId) }
+    var liveFirestoreApp by remember { mutableStateOf<com.avanyx.store.firebase.model.FirestoreApp?>(null) }
+    var selectedScreenshotForPreview by remember { mutableStateOf<String?>(null) }
+
+    val baseApp = remember(allApps, appId) {
+        allApps.find { it.id == appId || it.packageName == appId } ?: repository.getAppById(appId)
+    }
+
+    val app = remember(baseApp, liveFirestoreApp) {
+        val live = liveFirestoreApp
+        if (live != null && baseApp != null) {
+            baseApp.copy(
+                iconUrl = live.iconUrl.ifBlank { baseApp.iconUrl },
+                logoUrl = live.logoUrl.ifBlank { baseApp.logoUrl },
+                bannerUrl = live.bannerUrl.ifBlank { baseApp.bannerUrl },
+                screenshots = if (live.screenshots.isNotEmpty()) live.screenshots else baseApp.screenshots,
+                name = live.name.ifBlank { baseApp.name },
+                developer = live.developer.ifBlank { baseApp.developer },
+                developerUid = live.developerUid.ifBlank { baseApp.developerUid },
+                category = live.category.ifBlank { baseApp.category },
+                fullDescription = live.fullDescription.ifBlank { baseApp.fullDescription },
+                version = live.version.ifBlank { baseApp.version },
+                downloadUrl = live.downloadUrl.ifBlank { baseApp.downloadUrl },
+                checksumSha256 = live.checksumSha256.ifBlank { baseApp.checksumSha256 },
+                size = if (live.sizeMb.isNotBlank()) live.sizeMb else baseApp.size,
+                rating = if (live.rating > 0.0) live.rating else baseApp.rating,
+                isGame = live.isGame || baseApp.isGame,
+                isFeatured = live.isFeatured || baseApp.isFeatured
+            )
+        } else if (live != null && baseApp == null) {
+            StoreApp(
+                id = live.id,
+                name = live.name,
+                developer = live.developer,
+                developerUid = live.developerUid,
+                category = live.category,
+                categoryId = live.categoryId,
+                iconText = live.iconText,
+                iconBgColorHex = live.iconBgColorHex,
+                iconUrl = live.iconUrl,
+                logoUrl = live.logoUrl,
+                bannerUrl = live.bannerUrl,
+                screenshots = live.screenshots,
+                version = live.version,
+                versionCode = live.versionCode,
+                changelog = live.changelog,
+                size = live.sizeMb,
+                shortDescription = live.fullDescription.take(100),
+                fullDescription = live.fullDescription,
+                features = live.features,
+                rating = live.rating,
+                isGame = live.isGame,
+                isFeatured = live.isFeatured,
+                packageName = live.packageName,
+                downloadUrl = live.downloadUrl,
+                checksumSha256 = live.checksumSha256,
+                isPaid = live.isPaid,
+                price = live.price
+            )
+        } else {
+            baseApp
+        }
+    }
+
     val reviews by repository.getReviewsForApp(appId).collectAsStateWithLifecycle(initialValue = emptyList())
     val coroutineScope = rememberCoroutineScope()
     var showReviewDialog by remember { mutableStateOf(false) }
@@ -94,6 +160,16 @@ fun AppDetailsScreen(
             val db = com.avanyx.store.data.database.AppDatabase.getInstance(context)
             val fRepo = com.avanyx.store.data.repository.FirestoreRepository(appDatabase = db)
             fRepo.syncReviewsForApp(appId)
+        } catch (_: Exception) {}
+
+        // Instant Live App Fetch directly from Cloud Firestore for Developer Console updates
+        try {
+            val fService = com.avanyx.store.firebase.FirestoreService()
+            val result = fService.getApp(appId)
+            val loadedApp = result.getOrNull()
+            if (loadedApp != null) {
+                liveFirestoreApp = loadedApp
+            }
         } catch (_: Exception) {}
     }
 
@@ -171,6 +247,28 @@ fun AppDetailsScreen(
             )
         }
         return
+    }
+
+    val displayScreenshots = remember(app.screenshots, app.bannerUrl) {
+        val list = app.screenshots.filter { it.isNotBlank() }
+        val fallback = listOf(
+            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&auto=format&fit=crop&q=80"
+        )
+        when {
+            list.size >= 2 -> list
+            list.size == 1 -> {
+                val single = list.first()
+                if (app.bannerUrl.isNotBlank() && app.bannerUrl != single) {
+                    listOf(single, app.bannerUrl) + fallback.take(1)
+                } else {
+                    listOf(single) + fallback.take(2)
+                }
+            }
+            app.bannerUrl.isNotBlank() -> listOf(app.bannerUrl) + fallback.take(2)
+            else -> fallback
+        }
     }
 
     LazyColumn(
@@ -308,6 +406,144 @@ fun AppDetailsScreen(
                                     showTopMenu = false
                                     appsManager.uninstallApp(context, app.packageName)
                                 }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 0. Feature Banner / Promotional Graphic (Developer Console Banner)
+        item {
+            val bannerUrl = app.bannerUrl.ifBlank { liveDeveloperProfile?.bannerUrl.orEmpty() }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+            ) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .testTag("app_feature_banner")
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (bannerUrl.isNotBlank()) {
+                            com.avanyx.store.ui.components.StoreImageView(
+                                urlOrData = bannerUrl,
+                                contentDescription = "${app.name} Feature Graphic",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            // High-tech futuristic default gradient hero banner
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primary,
+                                                Color(0xFF7C3AED),
+                                                Color(0xFF4F46E5)
+                                            )
+                                        )
+                                    )
+                            )
+                        }
+
+                        // Gradient Scrim for readable text
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            Color.Black.copy(alpha = 0.75f)
+                                        )
+                                    )
+                                )
+                        )
+
+                        // Top Badges
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                                .align(Alignment.TopStart),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.65f),
+                                shape = RoundedCornerShape(100.dp),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Campaign,
+                                        contentDescription = null,
+                                        tint = Color(0xFFFFD700),
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (bannerUrl.isNotBlank()) "FEATURE GRAPHIC" else "OFFICIAL RELEASE",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            letterSpacing = 0.5.sp
+                                        ),
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            if (app.isFeatured) {
+                                Surface(
+                                    color = Color(0xFFFFB800),
+                                    shape = RoundedCornerShape(100.dp)
+                                ) {
+                                    Text(
+                                        text = "FEATURED",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Bottom Text Overlay
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = app.name,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Developer Showcase by ${app.developer} • Verified APK",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = Color.White.copy(alpha = 0.9f)
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -868,7 +1104,7 @@ fun AppDetailsScreen(
         }
 
         // Screenshots Section
-        if (app.screenshots.isNotEmpty()) {
+        if (displayScreenshots.isNotEmpty()) {
             item {
                 Column(
                     modifier = Modifier
@@ -876,7 +1112,7 @@ fun AppDetailsScreen(
                         .padding(vertical = 12.dp)
                 ) {
                     Text(
-                        text = "Screenshots",
+                        text = "Screenshots (${displayScreenshots.size})",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
@@ -886,16 +1122,21 @@ fun AppDetailsScreen(
                         contentPadding = PaddingValues(horizontal = 20.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(app.screenshots) { screenshotUrl ->
-                            AsyncImage(
-                                model = screenshotUrl,
-                                contentDescription = "${app.name} screenshot",
-                                contentScale = ContentScale.Crop,
+                        items(displayScreenshots) { screenshotUrl ->
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
                                 modifier = Modifier
                                     .size(width = 160.dp, height = 280.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                            )
+                                    .clickable { selectedScreenshotForPreview = screenshotUrl }
+                            ) {
+                                com.avanyx.store.ui.components.StoreImageView(
+                                    urlOrData = screenshotUrl,
+                                    contentDescription = "${app.name} screenshot",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
                 }
@@ -1526,5 +1767,46 @@ fun AppDetailsScreen(
             },
             onShowMessage = onShowMessage
         )
+    }
+
+    if (selectedScreenshotForPreview != null) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { selectedScreenshotForPreview = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.92f))
+                    .clickable { selectedScreenshotForPreview = null },
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier
+                        .fillMaxSize(0.9f)
+                        .clickable(enabled = false) {}
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        com.avanyx.store.ui.components.StoreImageView(
+                            urlOrData = selectedScreenshotForPreview.orEmpty(),
+                            contentDescription = "Full Preview",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        IconButton(
+                            onClick = { selectedScreenshotForPreview = null },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp)
+                                .background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

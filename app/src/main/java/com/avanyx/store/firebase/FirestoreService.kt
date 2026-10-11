@@ -273,13 +273,18 @@ class FirestoreService {
         return def
     }
 
-    private fun com.google.firebase.firestore.DocumentSnapshot.safeStringList(key: String): List<String> {
-        val raw = try { get(key) } catch (e: Throwable) { null }
-        if (raw is List<*>) {
-            return raw.mapNotNull { it?.toString()?.trim() }.filter { it.isNotBlank() }
-        }
-        if (raw is String && raw.isNotBlank()) {
-            return raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    private fun com.google.firebase.firestore.DocumentSnapshot.safeStringList(vararg keys: String): List<String> {
+        for (k in keys) {
+            val raw = try { get(k) } catch (e: Throwable) { null }
+            if (raw is List<*>) {
+                val list = raw.mapNotNull { it?.toString()?.trim() }.filter { it.isNotBlank() }
+                if (list.isNotEmpty()) return list
+            }
+            if (raw is String && raw.isNotBlank()) {
+                val cleaned = raw.trim().removeSurrounding("[", "]").replace("\"", "").replace("'", "")
+                val list = cleaned.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                if (list.isNotEmpty()) return list
+            }
         }
         return emptyList()
     }
@@ -291,9 +296,9 @@ class FirestoreService {
         val developerSlug = doc.safeString("developerSlug") ?: displayName.lowercase().replace(" ", "-")
         val bio = doc.safeString("bio", "shortDescription", "description") ?: ""
         val country = doc.safeString("country") ?: "India"
-        val avatarUrl = doc.safeString("avatarUrl", "logoUrl") ?: ""
-        val logoUrl = doc.safeString("logoUrl", "avatarUrl") ?: ""
-        val bannerUrl = doc.safeString("bannerUrl") ?: ""
+        val avatarUrl = doc.safeString("avatarUrl", "profileLogoUrl", "profile_logo_url", "logoUrl") ?: ""
+        val logoUrl = doc.safeString("profileLogoUrl", "logoUrl", "profile_logo_url", "avatarUrl") ?: avatarUrl
+        val bannerUrl = doc.safeString("bannerUrl", "banner_url", "headerImage") ?: ""
         val isVerified = doc.safeBoolean("verified", def = true)
         val officialWebsite = doc.safeString("officialWebsite", "websiteUrl", "website") ?: ""
         val githubUrl = doc.safeString("githubUrl") ?: ""
@@ -349,12 +354,32 @@ class FirestoreService {
         val iconText = doc.safeString("iconText", "icon_text") ?: (if (name.length >= 2) name.take(2).uppercase() else "APP")
         val iconBgColorHex = doc.safeString("iconBgColorHex", "icon_bg_color_hex") ?: "#6750A4"
 
-        val rawIcon = doc.safeString("iconUrl", "icon_url", "logoUrl", "logo_url", "logo", "icon")
-        val iconUrl = if (rawIcon?.startsWith("http") == true) rawIcon else ""
-        val rawLogo = doc.safeString("logoUrl", "logo_url", "logo", "iconUrl")
-        val logoUrl = if (rawLogo?.startsWith("http") == true) rawLogo else iconUrl
+        val rawIcon = doc.safeString("iconUrl", "icon_url", "logoUrl", "logo_url", "logo", "icon") ?: ""
+        val iconUrl = if (rawIcon.isNotBlank() && (rawIcon.startsWith("http") || rawIcon.startsWith("data:") || rawIcon.length > 20)) rawIcon else ""
+        val rawLogo = doc.safeString("logoUrl", "logo_url", "logo", "iconUrl") ?: ""
+        val logoUrl = if (rawLogo.isNotBlank() && (rawLogo.startsWith("http") || rawLogo.startsWith("data:") || rawLogo.length > 20)) rawLogo else iconUrl
 
-        val screenshots = doc.safeStringList("screenshots")
+        val bannerUrl = doc.safeString("bannerUrl", "banner_url", "featureGraphic", "feature_graphic", "promoBanner", "promo_banner", "bannerAssetUrl", "headerImage") ?: ""
+
+        val parsedScreenshots = doc.safeStringList("screenshots", "screenshotUrls", "screenshot_urls", "gallery", "images", "previewImages")
+        val defaultScreenshots = listOf(
+            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&auto=format&fit=crop&q=80"
+        )
+        val screenshots = when {
+            parsedScreenshots.size >= 2 -> parsedScreenshots
+            parsedScreenshots.size == 1 -> {
+                val single = parsedScreenshots.first()
+                if (bannerUrl.isNotBlank() && bannerUrl != single) {
+                    listOf(single, bannerUrl) + defaultScreenshots.take(1)
+                } else {
+                    listOf(single) + defaultScreenshots.take(2)
+                }
+            }
+            bannerUrl.isNotBlank() -> listOf(bannerUrl) + defaultScreenshots.take(2)
+            else -> defaultScreenshots
+        }
 
         val rawSizeMb = doc.safeString("apkSize", "sizeMb", "size") ?: "${doc.safeLong("sizeMb", def = 25L)} MB"
         val sizeMb = if (rawSizeMb.all { it.isDigit() }) "$rawSizeMb MB" else rawSizeMb
@@ -388,6 +413,7 @@ class FirestoreService {
             iconBgColorHex = iconBgColorHex,
             iconUrl = iconUrl,
             logoUrl = logoUrl,
+            bannerUrl = bannerUrl,
             screenshots = screenshots,
             sizeMb = sizeMb,
             rating = rating,
@@ -421,7 +447,15 @@ class FirestoreService {
                 if (!querySnap.isEmpty) {
                     Result.success(parseFirestoreAppDocument(querySnap.documents[0]))
                 } else {
-                    Result.success(null)
+                    val pkgSnap = db.collection(COLLECTION_APPS)
+                        .whereEqualTo("packageName", appId)
+                        .limit(1)
+                        .get().await()
+                    if (!pkgSnap.isEmpty) {
+                        Result.success(parseFirestoreAppDocument(pkgSnap.documents[0]))
+                    } else {
+                        Result.success(null)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -593,16 +627,161 @@ class FirestoreService {
                 val title = doc.safeString("title") ?: ""
                 val subtitle = doc.safeString("subtitle") ?: ""
                 val imageUrl = doc.safeString("imageUrl", "bannerImageUrl") ?: ""
-                val targetAppId = doc.safeString("targetAppId") ?: ""
+                val bannerImageUrl = doc.safeString("bannerImageUrl", "imageUrl") ?: ""
+                val targetAppId = doc.safeString("targetAppId", "appId") ?: ""
+                val targetType = doc.safeString("targetType") ?: "APP"
+                val badgeText = doc.safeString("badgeText") ?: "FEATURED"
+                val displayOrder = (doc.safeLong("displayOrder", "order", def = 0L)).toInt()
+                val order = (doc.safeLong("order", "displayOrder", def = 0L)).toInt()
+                val gradient = doc.safeString("gradient") ?: "from-[#1E142F] to-[#12131C]"
+                val ctaText = doc.safeString("ctaText") ?: "View App"
                 val isActive = doc.safeBoolean("isActive", def = true)
-                if (isActive && imageUrl.isNotBlank()) {
-                    FirestoreFeaturedBanner(id = id, title = title, subtitle = subtitle, imageUrl = imageUrl, targetAppId = targetAppId)
+                val finalImage = if (imageUrl.isNotBlank()) imageUrl else bannerImageUrl
+
+                if (isActive && (finalImage.isNotBlank() || title.isNotBlank())) {
+                    FirestoreFeaturedBanner(
+                        id = id,
+                        title = title,
+                        subtitle = subtitle,
+                        imageUrl = finalImage,
+                        bannerImageUrl = finalImage,
+                        targetAppId = targetAppId,
+                        targetType = targetType,
+                        badgeText = badgeText,
+                        displayOrder = displayOrder,
+                        order = order,
+                        gradient = gradient,
+                        ctaText = ctaText,
+                        isActive = isActive
+                    )
                 } else null
+            }.sortedBy { it.displayOrder }
+
+            if (banners.isNotEmpty()) {
+                Result.success(banners)
+            } else {
+                // Secondary fallback via Firestore REST
+                val restBanners = fetchFeaturedBannersViaRest()
+                Result.success(restBanners)
             }
-            Result.success(banners)
         } catch (e: Exception) {
-            Log.w(TAG, "getFeaturedBanners failed", e)
-            Result.failure(e)
+            Log.w(TAG, "getFeaturedBanners SDK notice, attempting REST fallback: ${e.message}")
+            val restBanners = fetchFeaturedBannersViaRest()
+            if (restBanners.isNotEmpty()) {
+                Result.success(restBanners)
+            } else {
+                Result.failure(e)
+            }
+        }
+    }
+
+    fun observeFeaturedBanners(): Flow<List<FirestoreFeaturedBanner>> = callbackFlow {
+        val db = safeGetFirestore() ?: getDefaultFirestore()
+        val listener = db.collection(COLLECTION_FEATURED_BANNERS)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "observeFeaturedBanners error: ${error.message}")
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val banners = snapshot.documents.mapNotNull { doc ->
+                        val id = doc.safeString("id") ?: doc.id
+                        val title = doc.safeString("title") ?: ""
+                        val subtitle = doc.safeString("subtitle") ?: ""
+                        val imageUrl = doc.safeString("imageUrl", "bannerImageUrl") ?: ""
+                        val bannerImageUrl = doc.safeString("bannerImageUrl", "imageUrl") ?: ""
+                        val targetAppId = doc.safeString("targetAppId", "appId") ?: ""
+                        val targetType = doc.safeString("targetType") ?: "APP"
+                        val badgeText = doc.safeString("badgeText") ?: "FEATURED"
+                        val displayOrder = (doc.safeLong("displayOrder", "order", def = 0L)).toInt()
+                        val order = (doc.safeLong("order", "displayOrder", def = 0L)).toInt()
+                        val gradient = doc.safeString("gradient") ?: "from-[#1E142F] to-[#12131C]"
+                        val ctaText = doc.safeString("ctaText") ?: "View App"
+                        val isActive = doc.safeBoolean("isActive", def = true)
+                        val finalImage = if (imageUrl.isNotBlank()) imageUrl else bannerImageUrl
+
+                        if (isActive && (finalImage.isNotBlank() || title.isNotBlank())) {
+                            FirestoreFeaturedBanner(
+                                id = id,
+                                title = title,
+                                subtitle = subtitle,
+                                imageUrl = finalImage,
+                                bannerImageUrl = finalImage,
+                                targetAppId = targetAppId,
+                                targetType = targetType,
+                                badgeText = badgeText,
+                                displayOrder = displayOrder,
+                                order = order,
+                                gradient = gradient,
+                                ctaText = ctaText,
+                                isActive = isActive
+                            )
+                        } else null
+                    }.sortedBy { it.displayOrder }
+                    trySend(banners)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    private fun fetchFeaturedBannersViaRest(): List<FirestoreFeaturedBanner> {
+        return try {
+            val url = java.net.URL("https://firestore.googleapis.com/v1/projects/avanyx-store/databases/(default)/documents/featured_banners")
+            val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "AVANYX-Store-Android/3.1")
+            }
+            if (conn.responseCode == 200) {
+                val jsonStr = conn.inputStream.bufferedReader().use { it.readText() }
+                val root = org.json.JSONObject(jsonStr)
+                val docs = root.optJSONArray("documents") ?: return emptyList()
+                val list = mutableListOf<FirestoreFeaturedBanner>()
+                for (i in 0 until docs.length()) {
+                    val docObj = docs.getJSONObject(i)
+                    val fields = docObj.optJSONObject("fields") ?: continue
+                    fun str(key: String): String = fields.optJSONObject(key)?.optString("stringValue", "") ?: ""
+                    fun bool(key: String, def: Boolean = true): Boolean = fields.optJSONObject(key)?.optBoolean("booleanValue", def) ?: def
+                    fun int(key: String): Int = fields.optJSONObject(key)?.optInt("integerValue", 0) ?: 0
+
+                    val title = str("title")
+                    val subtitle = str("subtitle")
+                    val img = str("imageUrl").ifBlank { str("bannerImageUrl") }
+                    val targetAppId = str("targetAppId")
+                    val id = str("id").ifBlank { docObj.optString("name").substringAfterLast("/") }
+                    val active = bool("isActive", true)
+                    val badge = str("badgeText").ifBlank { "FEATURED" }
+                    val cta = str("ctaText").ifBlank { "View App" }
+                    val grad = str("gradient").ifBlank { "from-[#1E142F] to-[#12131C]" }
+                    val order = int("displayOrder").let { if (it != 0) it else int("order") }
+
+                    if (active && (img.isNotBlank() || title.isNotBlank())) {
+                        list.add(
+                            FirestoreFeaturedBanner(
+                                id = id,
+                                title = title,
+                                subtitle = subtitle,
+                                imageUrl = img,
+                                bannerImageUrl = img,
+                                targetAppId = targetAppId,
+                                targetType = str("targetType").ifBlank { "APP" },
+                                badgeText = badge,
+                                displayOrder = order,
+                                order = order,
+                                gradient = grad,
+                                ctaText = cta,
+                                isActive = active
+                            )
+                        )
+                    }
+                }
+                list.sortedBy { it.displayOrder }
+            } else {
+                emptyList()
+            }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 

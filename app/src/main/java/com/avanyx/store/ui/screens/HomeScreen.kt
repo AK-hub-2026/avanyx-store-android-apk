@@ -17,19 +17,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -77,6 +72,9 @@ fun HomeScreen(
 
     val db = remember(context) { com.avanyx.store.data.database.AppDatabase.getInstance(context) }
     val unreadNotificationsCount by db.notificationDao().getUnreadCount().collectAsStateWithLifecycle(initialValue = 0)
+
+    val fRepo = remember(db) { com.avanyx.store.data.repository.FirestoreRepository(appDatabase = db) }
+    val liveFeaturedBanners: List<com.avanyx.store.firebase.model.FirestoreFeaturedBanner> by fRepo.observeFeaturedBanners().collectAsStateWithLifecycle(initialValue = emptyList())
 
     val allApps by repository.getApps().collectAsState(initial = emptyList())
     val installedApps by appsManager.installedAppsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -182,58 +180,45 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Title & Logo branding
+                // Title & Logo branding matching official store
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Custom stylized premium Avanyx Logo
-                    Box(
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = com.avanyx.store.R.drawable.avanyx_logo),
+                        contentDescription = "AVANYX Logo",
                         modifier = Modifier
                             .size(38.dp)
                             .clip(RoundedCornerShape(11.dp))
-                            .background(
-                                androidx.compose.ui.graphics.Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        Color(0xFF9C27B0)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
-                            val w = size.width
-                            val h = size.height
-                            val path = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(w * 0.5f, 0f)
-                                lineTo(w, h)
-                                lineTo(w * 0.75f, h)
-                                lineTo(w * 0.5f, h * 0.4f)
-                                lineTo(w * 0.25f, h)
-                                lineTo(0f, h)
-                                close()
-                            }
-                            drawPath(
-                                path = path,
-                                color = Color.White
+                    )
+                    Column {
+                        Text(
+                            text = "AVANYX Store",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onBackground
                             )
-                            drawRect(
-                                color = Color.White,
-                                topLeft = androidx.compose.ui.geometry.Offset(w * 0.35f, h * 0.65f),
-                                size = androidx.compose.ui.geometry.Size(w * 0.3f, h * 0.12f)
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "100% Verified APKs",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF10B981)
+                                )
                             )
                         }
                     }
-                    Text(
-                        text = "AVANYX",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 22.sp,
-                            letterSpacing = 1.sp,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    )
                 }
 
                 Row(
@@ -293,22 +278,23 @@ fun HomeScreen(
             }
         }
 
-        // Quick Search Bar (Navigates to search on tap)
+        // Quick Search Bar with AI Voice indicator
         item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
                     .clip(RoundedCornerShape(100.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                     .clickable(onClick = onNavigateToSearch)
-                    .padding(horizontal = 18.dp, vertical = 14.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
                     .testTag("home_search_bar"),
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -317,42 +303,32 @@ fun HomeScreen(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "Search apps & games",
+                        text = "Search verified APKs, games, AI...",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f)
                     )
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Voice Search",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .padding(5.dp)
+                        )
+                    }
                 }
             }
         }
 
-        // Featured Hero Banner
-        item {
-            if (featuredApps.isNotEmpty()) {
-                val hero = featuredApps.first()
-                Column(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                ) {
-                    FeaturedAppCard(
-                        app = hero,
-                        onClick = { onNavigateToDetails(hero.id) },
-                        onInstallClick = {
-                            downloadEngine.startOrResumeDownload(
-                                appId = hero.id,
-                                appName = hero.name,
-                                downloadUrl = hero.downloadUrl,
-                                expectedChecksum = hero.checksumSha256
-                            )
-                            onShowMessage("Downloading ${hero.name}...")
-                        }
-                    )
-                }
-            }
-        }
-
-        // Horizontal Categories chips
+        // Horizontal Categories filter chips
         item {
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -374,6 +350,485 @@ fun HomeScreen(
                             }
                         }
                     )
+                }
+            }
+        }
+
+        // Dynamic Special Banners (Developer Console / Admin promoted highlights from Firestore)
+        item {
+            val banners = remember(liveFeaturedBanners, allApps) {
+                val list = if (liveFeaturedBanners.isNotEmpty()) {
+                    liveFeaturedBanners.map { banner ->
+                        val matchingApp = allApps.find { it.id == banner.targetAppId || it.packageName == banner.targetAppId || it.name.equals(banner.title, ignoreCase = true) }
+                        val rawImg = banner.imageUrl.ifBlank { banner.bannerImageUrl }
+                        val resolvedImg = if (rawImg.isNotBlank() && !rawImg.startsWith("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAPoCAYAAABNo9Tk")) {
+                            rawImg
+                        } else if (matchingApp != null && matchingApp.bannerUrl.isNotBlank()) {
+                            matchingApp.bannerUrl
+                        } else if (rawImg.isNotBlank()) {
+                            rawImg
+                        } else {
+                            matchingApp?.iconUrl.orEmpty()
+                        }
+
+                        val resolvedTitle = if (banner.title.length <= 4 && matchingApp != null) matchingApp.name else banner.title
+                        val resolvedSubtitle = if (matchingApp != null && (banner.subtitle.contains("v1.0.0") || banner.subtitle.length < 15)) {
+                            "${matchingApp.developer} • ${matchingApp.shortDescription.ifBlank { matchingApp.category }}"
+                        } else {
+                            banner.subtitle
+                        }
+
+                        banner.copy(
+                            title = resolvedTitle,
+                            subtitle = resolvedSubtitle,
+                            imageUrl = resolvedImg,
+                            bannerImageUrl = resolvedImg
+                        )
+                    }
+                } else {
+                    listOf(
+                        com.avanyx.store.firebase.model.FirestoreFeaturedBanner(
+                            id = "banner_speed_limit",
+                            title = "Speed Limit 3D",
+                            subtitle = "High-octane arcade racing simulation with realistic physics engine",
+                            badgeText = "TOP RACING GAME",
+                            targetAppId = allApps.find { it.name.contains("Speed", ignoreCase = true) }?.id ?: "speed_limit_3d",
+                            ctaText = "Play Now",
+                            imageUrl = "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=1200&auto=format&fit=crop&q=80"
+                        ),
+                        com.avanyx.store.firebase.model.FirestoreFeaturedBanner(
+                            id = "promo_alok",
+                            title = "AVANYX Store",
+                            subtitle = "Official high-performance app marketplace with verified security",
+                            badgeText = "FEATURED APP",
+                            targetAppId = allApps.find { it.id.contains("avanyx", ignoreCase = true) }?.id ?: (allApps.firstOrNull()?.id ?: ""),
+                            ctaText = "View App",
+                            imageUrl = allApps.find { it.id.contains("avanyx", ignoreCase = true) }?.bannerUrl ?: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80"
+                        )
+                    )
+                }
+                list
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Campaign,
+                            contentDescription = null,
+                            tint = Color(0xFFFFB800),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Featured & Highlights",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(100.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = if (liveFeaturedBanners.isNotEmpty()) "Live" else "Featured",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                androidx.compose.foundation.lazy.LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(banners) { banner ->
+                        val targetApp = remember(banner.targetAppId, allApps) {
+                            allApps.find { it.id == banner.targetAppId || it.packageName == banner.targetAppId }
+                        }
+                        val bannerImg = banner.imageUrl.ifBlank { banner.bannerImageUrl }.ifBlank { targetApp?.bannerUrl.orEmpty() }
+
+                        Card(
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                            modifier = Modifier
+                                .width(310.dp)
+                                .height(190.dp)
+                                .clickable {
+                                    if (banner.targetAppId.isNotBlank()) {
+                                        onNavigateToDetails(banner.targetAppId)
+                                    } else if (targetApp != null) {
+                                        onNavigateToDetails(targetApp.id)
+                                    } else {
+                                        onShowMessage("Banner: ${banner.title}")
+                                    }
+                                }
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                if (bannerImg.isNotBlank()) {
+                                    com.avanyx.store.ui.components.StoreImageView(
+                                        urlOrData = bannerImg,
+                                        contentDescription = banner.title,
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                androidx.compose.ui.graphics.Brush.linearGradient(
+                                                    colors = listOf(Color(0xFF31104B), Color(0xFF1E1B4B), Color(0xFF0F172A))
+                                                )
+                                            )
+                                    )
+                                }
+
+                                // Dark Scrim Overlay for crystal-clear readability
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Black.copy(alpha = 0.25f),
+                                                    Color.Black.copy(alpha = 0.6f),
+                                                    Color.Black.copy(alpha = 0.92f)
+                                                )
+                                            )
+                                        )
+                                )
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(14.dp),
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(100.dp),
+                                            color = Color.Black.copy(alpha = 0.7f),
+                                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                                        ) {
+                                            Text(
+                                                text = banner.badgeText.ifBlank { "FEATURED" }.uppercase(),
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.sp),
+                                                color = Color(0xFFFFD700),
+                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                                            )
+                                        }
+
+                                        if (targetApp != null) {
+                                            Surface(
+                                                shape = RoundedCornerShape(100.dp),
+                                                color = Color.Black.copy(alpha = 0.65f),
+                                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f))
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFFFFB800),
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(3.dp))
+                                                    Text(
+                                                        text = "${targetApp.rating}",
+                                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                                        color = Color.White
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Column {
+                                        Text(
+                                            text = banner.title,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = 17.sp),
+                                            color = Color.White,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = banner.subtitle,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp, lineHeight = 15.sp),
+                                            color = Color.White.copy(alpha = 0.9f),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color.White.copy(alpha = 0.15f))
+                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = banner.ctaText.ifBlank { "View App" },
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 11.sp),
+                                                color = Color.White
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Default.ArrowForward,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Editor's Choice Spotlight (Full-width Special Banner from Admin / Console)
+        item {
+            val spotlightApp = remember(allApps) {
+                allApps.find { it.id.contains("avanyx", ignoreCase = true) || it.name.contains("avanyx", ignoreCase = true) }
+                    ?: allApps.firstOrNull { it.isFeatured }
+                    ?: allApps.firstOrNull()
+            }
+
+            if (spotlightApp != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFB800),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Editor's Choice Spotlight",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = Color(0xFFD97706).copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, Color(0xFFD97706).copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "VERIFIED FEATURE",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                color = Color(0xFFF59E0B),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Card(
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(210.dp)
+                            .clickable { onNavigateToDetails(spotlightApp.id) }
+                            .testTag("editor_choice_spotlight")
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // Feature Graphic Image
+                            val spotlightImg = spotlightApp.bannerUrl.ifBlank { spotlightApp.screenshots.firstOrNull().orEmpty() }
+                            if (spotlightImg.isNotBlank()) {
+                                com.avanyx.store.ui.components.StoreImageView(
+                                    urlOrData = spotlightImg,
+                                    contentDescription = "${spotlightApp.name} Spotlight Banner",
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                                colors = listOf(Color(0xFF1E3A8A), Color(0xFF4338CA), Color(0xFF6D28D9))
+                                            )
+                                        )
+                                    )
+                            }
+
+                            // Dark Gradient Scrim
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.35f),
+                                                Color.Black.copy(alpha = 0.9f)
+                                            )
+                                        )
+                                    )
+                            )
+
+                            // Top Badges
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
+                                    .align(Alignment.TopStart),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Surface(
+                                        color = Color.Black.copy(alpha = 0.65f),
+                                        shape = RoundedCornerShape(100.dp),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                                    ) {
+                                        Text(
+                                            text = "FEATURED SPOTLIGHT",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.sp),
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                    Surface(
+                                        color = Color(0xFF10B981),
+                                        shape = RoundedCornerShape(100.dp)
+                                    ) {
+                                        Text(
+                                            text = "FREE",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.sp),
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    color = Color.Black.copy(alpha = 0.65f),
+                                    shape = RoundedCornerShape(100.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.VerifiedUser,
+                                            contentDescription = null,
+                                            tint = Color(0xFF10B981),
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(3.dp))
+                                        Text(
+                                            text = "99% Clean",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                            color = Color(0xFF10B981)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Bottom Content Overlay
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
+                                    .align(Alignment.BottomStart),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                                    modifier = Modifier.size(52.dp)
+                                ) {
+                                    com.avanyx.store.ui.components.AppIconView(
+                                        app = spotlightApp,
+                                        size = 52.dp,
+                                        cornerRadius = 14.dp,
+                                        fontSize = 18.sp
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = spotlightApp.name,
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${spotlightApp.developer} • ★ ${spotlightApp.rating} • ${spotlightApp.size}",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        downloadEngine.startOrResumeDownload(
+                                            appId = spotlightApp.id,
+                                            appName = spotlightApp.name,
+                                            downloadUrl = spotlightApp.downloadUrl,
+                                            expectedChecksum = spotlightApp.checksumSha256
+                                        )
+                                        onShowMessage("Downloading ${spotlightApp.name}...")
+                                    },
+                                    shape = RoundedCornerShape(100.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDownward,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp).padding(end = 2.dp)
+                                    )
+                                    Text("Get App", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

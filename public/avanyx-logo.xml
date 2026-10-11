@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- Background Squircle with #4F46E5 -->
+    <path
+        android:pathData="M 114,0 H 398 A 114,114 0 0 1 512,114 V 398 A 114,114 0 0 1 398,512 H 114 A 114,114 0 0 1 0,398 V 114 A 114,114 0 0 1 114,0 Z"
+        android:fillColor="#4F46E5" />
+
+    <!-- White Geometric Frame -->
+    <path
+        android:pathData="M 256,114 L 389,389 H 322 L 256,256 L 190,389 H 123 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Cyan Core Triangle -->
+    <path
+        android:pathData="M 180,303 H 332 L 256,161 Z"
+        android:fillColor="#38BDF8" />
+</vector>

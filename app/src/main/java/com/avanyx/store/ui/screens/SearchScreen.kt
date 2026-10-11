@@ -5,6 +5,11 @@ import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,6 +45,8 @@ import com.avanyx.store.data.model.StoreApp
 import com.avanyx.store.data.repository.AppRepository
 import com.avanyx.store.data.search.AISearchProvider
 import com.avanyx.store.data.search.AISearchResult
+import com.avanyx.store.data.search.LiveAISearchEngine
+import com.avanyx.store.data.search.LiveVoiceAssistant
 import com.avanyx.store.download.DownloadManagerEngine
 import com.avanyx.store.manager.InstalledAppsManager
 import com.avanyx.store.ui.components.AppCard
@@ -47,6 +54,53 @@ import com.avanyx.store.ui.components.GlassMessageCard
 import com.avanyx.store.ui.components.GlassMessageData
 import com.avanyx.store.ui.components.GlassMessageType
 import kotlinx.coroutines.launch
+
+@Composable
+fun AudioWaveformIndicator(
+    isSpeaking: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "audio_wave")
+    val heights = listOf(
+        infiniteTransition.animateFloat(
+            initialValue = 6f, targetValue = 22f,
+            animationSpec = infiniteRepeatable(androidx.compose.animation.core.tween(450, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "h1"
+        ),
+        infiniteTransition.animateFloat(
+            initialValue = 18f, targetValue = 8f,
+            animationSpec = infiniteRepeatable(androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "h2"
+        ),
+        infiniteTransition.animateFloat(
+            initialValue = 10f, targetValue = 26f,
+            animationSpec = infiniteRepeatable(androidx.compose.animation.core.tween(520, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "h3"
+        ),
+        infiniteTransition.animateFloat(
+            initialValue = 24f, targetValue = 12f,
+            animationSpec = infiniteRepeatable(androidx.compose.animation.core.tween(410, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "h4"
+        ),
+        infiniteTransition.animateFloat(
+            initialValue = 8f, targetValue = 20f,
+            animationSpec = infiniteRepeatable(androidx.compose.animation.core.tween(480, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "h5"
+        )
+    )
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        heights.forEach { hAnim ->
+            val h = if (isSpeaking) hAnim.value.dp else 6.dp
+            Box(
+                modifier = Modifier
+                    .width(3.5.dp)
+                    .height(h)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color(0xFF38BDF8))
+            )
+        }
+    }
+}
 
 @Composable
 fun SearchScreen(
@@ -75,13 +129,21 @@ fun SearchScreen(
     var glassError by remember { mutableStateOf<GlassMessageData?>(null) }
 
     val aiProvider = remember(repository) { AISearchProvider(repository) }
+    val liveEngine = remember { LiveAISearchEngine() }
+    val voiceAssistant = remember(context) { LiveVoiceAssistant(context) }
+    DisposableEffect(voiceAssistant) {
+        onDispose {
+            voiceAssistant.shutdown()
+        }
+    }
+    val isSpeaking by voiceAssistant.isSpeaking.collectAsStateWithLifecycle()
 
     var recentSearches by remember {
-        mutableStateOf(listOf("Google Photos", "AVANYX Launcher", "Camera Pro", "Racing 3D"))
+        mutableStateOf(listOf("Speed Limit 3D", "Bomb Rush 3D", "AutoPDF", "Alok Dev"))
     }
 
     val trendingKeywords = remember {
-        listOf("AI Assistant", "VPN Proxy", "Crypto Wallet", "Cyberpunk", "Audiobook", "Photo Editor", "Cloud Gaming")
+        listOf("Speed Limit 3D", "Racing Games", "PDF Tools", "Verified Clean", "Alok Developer", "Action Games")
     }
 
     val popularCategories = remember {
@@ -89,6 +151,10 @@ fun SearchScreen(
     }
 
     val allApps by repository.getApps().collectAsState(initial = emptyList())
+
+    val liveResponse = remember(searchQuery, allApps) {
+        liveEngine.processLiveQuery(searchQuery, allApps)
+    }
 
     val searchResults = remember(searchQuery, allApps) {
         if (searchQuery.isBlank()) emptyList() else allApps.filter {
@@ -145,7 +211,10 @@ fun SearchScreen(
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!spokenText.isNullOrEmpty()) {
                 searchQuery = spokenText
-                onShowMessage("Voice recognized: '$spokenText'")
+                isAiSearchMode = true
+                val resp = liveEngine.processLiveQuery(spokenText, allApps)
+                voiceAssistant.speak(resp.spokenText)
+                onShowMessage("AI Listening & Responding: '$spokenText'")
             }
         }
     }
@@ -385,108 +454,194 @@ fun SearchScreen(
                 }
             }
 
-            if (isAiSearchMode && searchQuery.isNotBlank()) {
-                // AI SEARCH RESULTS MODE
-                if (isAiLoading) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(180.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = Color(0xFF9C27B0))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "Analyzing query with AI Knowledge Engine...",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                } else if (aiResult != null) {
-                    item {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color(0xFF1E102E).copy(alpha = 0.85f),
-                            border = BorderStroke(1.dp, Color(0xFF9C27B0).copy(alpha = 0.35f)),
-                            shadowElevation = 6.dp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(18.dp)) {
+            if (isAiSearchMode || searchQuery.isNotBlank()) {
+                // LIVE AI ASSISTANT & RESULTS
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(22.dp),
+                        color = Color(0xFF1E102E),
+                        border = BorderStroke(1.dp, Color(0xFF9C27B0).copy(alpha = 0.45f)),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            // Header with title, language badge, audio visualizer, speak/stop & mic
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = Color(0xFFD8B4FE),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Text(
-                                        text = aiResult!!.sourceTitle,
-                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
-                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFF9C27B0).copy(alpha = 0.25f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = Color(0xFFD8B4FE),
+                                            modifier = Modifier
+                                                .padding(6.dp)
+                                                .size(18.dp)
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "Live AI Store Assistant",
+                                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = if (liveResponse.isHindi) "Hindi & English Voice • Live" else "Multilingual Voice • Live",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                            color = Color(0xFFD8B4FE).copy(alpha = 0.8f)
+                                        )
+                                    }
                                 }
 
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    // Soundwave when speaking
+                                    AudioWaveformIndicator(isSpeaking = isSpeaking)
 
+                                    // Speak / Mute button
+                                    IconButton(
+                                        onClick = {
+                                            if (isSpeaking) {
+                                                voiceAssistant.stopSpeaking()
+                                            } else {
+                                                voiceAssistant.speak(liveResponse.spokenText)
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF9C27B0).copy(alpha = 0.3f))
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isSpeaking) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                            contentDescription = if (isSpeaking) "Stop Voice" else "Speak Answer",
+                                            tint = if (isSpeaking) Color(0xFF38BDF8) else Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    // Mic button to talk back
+                                    IconButton(
+                                        onClick = {
+                                            voiceAssistant.stopSpeaking()
+                                            recordAudioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                        },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF6750A4))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Mic,
+                                            contentDescription = "Talk to AI",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = liveResponse.displayText,
+                                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                                color = Color.White.copy(alpha = 0.95f)
+                            )
+
+                            // Follow up suggestion chips
+                            if (liveResponse.followUpSuggestions.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = aiResult!!.summary,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.9f)
+                                    text = "Ask AI (Tap to query):",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = Color(0xFFD8B4FE)
                                 )
-
-                                if (!aiResult!!.sourceUrl.isNullOrEmpty()) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Text(
-                                        text = "Source Index: ${aiResult!!.sourceUrl}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFFD8B4FE)
-                                    )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(liveResponse.followUpSuggestions) { sug ->
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = Color.White.copy(alpha = 0.12f),
+                                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                                            modifier = Modifier.clickable {
+                                                searchQuery = sug
+                                                val r = liveEngine.processLiveQuery(sug, allApps)
+                                                voiceAssistant.speak(r.spokenText)
+                                            }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ChatBubbleOutline,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFF38BDF8),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = sug,
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                }
 
-                    if (aiResult!!.matchedApps.isNotEmpty()) {
-                        item {
-                            Text(
-                                text = "AI Recommended Apps",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.padding(vertical = 8.dp)
+                val matchedList = if (liveResponse.matchedApps.isNotEmpty()) liveResponse.matchedApps else searchResults
+                if (matchedList.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = if (isAiSearchMode) "AI Matched Applications (${matchedList.size})" else "Matched Results (${matchedList.size})",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+
+                    items(matchedList, key = { "match_${it.id}" }) { app ->
+                        val actionState = remember(app, installedMap, downloadsMap) {
+                            appsManager.determineActionState(
+                                appId = app.id,
+                                packageName = app.packageName,
+                                storeVersion = app.version,
+                                storeVersionCode = app.versionCode,
+                                storeSize = app.size,
+                                installedApp = installedMap[app.packageName],
+                                activeDownload = downloadsMap[app.id]
                             )
                         }
-
-                        items(aiResult!!.matchedApps, key = { "ai_${it.id}" }) { app ->
-                            val actionState = remember(app, installedMap, downloadsMap) {
-                                appsManager.determineActionState(
-                                    appId = app.id,
-                                    packageName = app.packageName,
-                                    storeVersion = app.version,
-                                    storeVersionCode = app.versionCode,
-                                    storeSize = app.size,
-                                    installedApp = installedMap[app.packageName],
-                                    activeDownload = downloadsMap[app.id]
-                                )
-                            }
-                            AppCard(
-                                app = app,
-                                onClick = { onNavigateToDetails(app.id) },
-                                actionState = actionState,
-                                onActionClick = { state -> handleAppAction(app, state) },
-                                onInstallClick = { handleAppAction(app, AppActionState.Install) },
-                                onDeveloperClick = onNavigateToDeveloper,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        }
+                        AppCard(
+                            app = app,
+                            onClick = { onNavigateToDetails(app.id) },
+                            actionState = actionState,
+                            onActionClick = { state -> handleAppAction(app, state) },
+                            onInstallClick = { handleAppAction(app, AppActionState.Install) },
+                            onDeveloperClick = onNavigateToDeveloper,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
                 }
             } else if (searchQuery.isBlank()) {

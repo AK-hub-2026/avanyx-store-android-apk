@@ -65,14 +65,39 @@ fun FeaturedAppCard(
             .fillMaxWidth()
             .height(200.dp)
             .clip(RoundedCornerShape(24.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(AvanyxGradientStart, AvanyxGradientEnd)
-                )
-            )
             .clickable(onClick = onClick)
             .testTag("featured_app_card_${app.id}")
     ) {
+        if (app.bannerUrl.isNotBlank()) {
+            StoreImageView(
+                urlOrData = app.bannerUrl,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.35f),
+                                Color.Black.copy(alpha = 0.85f)
+                            )
+                        )
+                    )
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(AvanyxGradientStart, AvanyxGradientEnd)
+                        )
+                    )
+            )
+        }
         // Overlay label top-right
         Surface(
             modifier = Modifier

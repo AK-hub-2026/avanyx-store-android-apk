@@ -201,10 +201,27 @@ class WebsiteCatalogService(
                 val iconBgColorHex = getStringField("iconBgColorHex", "icon_bg_color_hex").ifBlank { "#6750A4" }
                 val iconUrl = getStringField("iconUrl", "icon_url", "logoUrl", "logo", "icon")
                 val logoUrl = getStringField("logoUrl", "logo_url", "logo", "iconUrl").ifBlank { iconUrl }
+                val bannerUrl = getStringField("bannerUrl", "banner_url", "featureGraphic", "feature_graphic", "promoBanner", "bannerAssetUrl")
                 val screenshots = getStringArrayField("screenshots")
-                val screenshotsJson = if (screenshots.isNotEmpty()) {
-                    com.avanyx.store.data.database.Converters().fromListToString(screenshots)
-                } else ""
+                val defaultScreenshots = listOf(
+                    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+                    "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80",
+                    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&auto=format&fit=crop&q=80"
+                )
+                val finalScreenshots = when {
+                    screenshots.size >= 2 -> screenshots
+                    screenshots.size == 1 -> {
+                        val single = screenshots.first()
+                        if (bannerUrl.isNotBlank() && bannerUrl != single) {
+                            listOf(single, bannerUrl) + defaultScreenshots.take(1)
+                        } else {
+                            listOf(single) + defaultScreenshots.take(2)
+                        }
+                    }
+                    bannerUrl.isNotBlank() -> listOf(bannerUrl) + defaultScreenshots.take(2)
+                    else -> defaultScreenshots
+                }
+                val screenshotsJson = com.avanyx.store.data.database.Converters().fromListToString(finalScreenshots)
                 val rawSize = getStringField("apkSize", "sizeMb", "size")
                 val sizeMb = when {
                     rawSize.isNotBlank() -> if (rawSize.all { it.isDigit() }) "$rawSize MB" else rawSize
@@ -248,6 +265,7 @@ class WebsiteCatalogService(
                         iconBgColorHex = iconBgColorHex,
                         iconUrl = iconUrl,
                         logoUrl = logoUrl,
+                        bannerUrl = bannerUrl,
                         screenshotsJson = screenshotsJson,
                         sizeMb = sizeMb,
                         rating = rating,
@@ -340,6 +358,7 @@ class WebsiteCatalogService(
         val iconBgColorHex = obj.optString("iconBgColorHex", obj.optString("icon_bg_color_hex", "#6750A4"))
         val iconUrl = obj.optString("iconUrl", obj.optString("icon_url", obj.optString("logoUrl", obj.optString("logo", obj.optString("icon", "")))))
         val logoUrl = obj.optString("logoUrl", obj.optString("logo_url", obj.optString("logo", obj.optString("iconUrl", iconUrl))))
+        val bannerUrl = obj.optString("bannerUrl", obj.optString("banner_url", obj.optString("featureGraphic", obj.optString("promoBanner", ""))))
         
         val screenshotsArray = obj.optJSONArray("screenshots")
         val screenshotsList = mutableListOf<String>()
@@ -349,11 +368,25 @@ class WebsiteCatalogService(
                 if (url.isNotBlank()) screenshotsList.add(url)
             }
         }
-        val screenshotsJson = if (screenshotsList.isNotEmpty()) {
-            com.avanyx.store.data.database.Converters().fromListToString(screenshotsList)
-        } else {
-            obj.optString("screenshots", "")
+        val defaultScreenshots = listOf(
+            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&auto=format&fit=crop&q=80"
+        )
+        val finalScreenshots = when {
+            screenshotsList.size >= 2 -> screenshotsList
+            screenshotsList.size == 1 -> {
+                val single = screenshotsList.first()
+                if (bannerUrl.isNotBlank() && bannerUrl != single) {
+                    listOf(single, bannerUrl) + defaultScreenshots.take(1)
+                } else {
+                    listOf(single) + defaultScreenshots.take(2)
+                }
+            }
+            bannerUrl.isNotBlank() -> listOf(bannerUrl) + defaultScreenshots.take(2)
+            else -> defaultScreenshots
         }
+        val screenshotsJson = com.avanyx.store.data.database.Converters().fromListToString(finalScreenshots)
 
         val rawSize = obj.optString("sizeMb", obj.optString("size", "25 MB"))
         val sizeMb = if (rawSize.all { it.isDigit() }) "$rawSize MB" else rawSize
@@ -379,6 +412,7 @@ class WebsiteCatalogService(
             iconBgColorHex = iconBgColorHex.ifBlank { "#6750A4" },
             iconUrl = iconUrl,
             logoUrl = logoUrl,
+            bannerUrl = bannerUrl,
             screenshotsJson = screenshotsJson,
             sizeMb = sizeMb.ifBlank { "25 MB" },
             rating = if (rating > 0.0) rating else 4.9,

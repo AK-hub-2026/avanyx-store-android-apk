@@ -1,0 +1,16 @@
+/* TEAM */
+  Developer & Architect: AVANYX Core Engineering Team
+  Contact: team@avanyx.io
+  Twitter: @avanyxstore
+  Location: Global / Remote
+
+/* THANKS */
+  Open Source Community
+  Android Open Source Project (AOSP)
+  Indie Developers & Student Creators
+
+/* SITE */
+  Standards: HTML5, CSS3, ES2024, TypeScript, React 18, Vite, Tailwind CSS
+  Components: Lucide Icons, Motion, Auto SEO Engine
+  Security: CyberShield AI Scanner, SHA-256 Cryptographic Audit
+  Hosting: Cloud Run / Cloudflare Pages / Global CDN

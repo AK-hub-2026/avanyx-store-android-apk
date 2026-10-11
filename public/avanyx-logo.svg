@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background Squircle -->
+  <rect width="512" height="512" rx="114" fill="#4F46E5" />
+  
+  <!-- White Geometric Frame -->
+  <path d="M 256 114 L 389 389 H 322 L 256 256 L 190 389 H 123 Z" fill="#FFFFFF" />
+  
+  <!-- Cyan Core Triangle -->
+  <path d="M 180 303 H 332 L 256 161 Z" fill="#38BDF8" />
+</svg>
