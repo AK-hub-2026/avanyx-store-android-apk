@@ -53,6 +53,10 @@ android {
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
   }
+
+  base {
+    archivesName.set("avanyx-store")
+  }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
@@ -69,6 +73,11 @@ android {
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
+  ignoreList.add("SUPABASE_SERVICE_ROLE_KEY")
+  ignoreList.add("FIREBASE_PRIVATE_KEY")
+  ignoreList.add("FIREBASE_CLIENT_EMAIL")
+  ignoreList.add("BACKEND_SECRET")
+  ignoreList.add("VITE_.*")
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.ERROR }

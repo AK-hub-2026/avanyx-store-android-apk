@@ -100,25 +100,49 @@ jobs:
 
       - name: Verify Release APK Exists
         run: |
-          echo "=== VERIFYING RELEASE APK OUTPUT ==="
+          echo "=== VERIFYING RELEASE APK OUTPUT & SIGNATURE ==="
           mkdir -p app/build/outputs/apk/release/
-          if [ -f .build-outputs/app-release.apk ] && [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp .build-outputs/app-release.apk app/build/outputs/apk/release/app-release.apk
+          # Ensure avanyx-store.apk is present from gradle output
+          if [ ! -f app/build/outputs/apk/release/avanyx-store.apk ]; then
+            if [ -f app/build/outputs/apk/release/avanyx-store-release.apk ]; then
+              cp app/build/outputs/apk/release/avanyx-store-release.apk app/build/outputs/apk/release/avanyx-store.apk
+            elif [ -f app/build/outputs/apk/release/app-release.apk ]; then
+              cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/avanyx-store.apk
+            fi
           fi
-          if [ ! -f app/build/outputs/apk/release/app-release.apk ] && [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
-            cp app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/app-release.apk
-          fi
-          if [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
-            echo "ERROR: app/build/outputs/apk/release/app-release.apk does not exist!"
+          if [ ! -f app/build/outputs/apk/release/avanyx-store.apk ]; then
+            echo "ERROR: app/build/outputs/apk/release/avanyx-store.apk does not exist!"
             exit 1
           fi
-          ls -l app/build/outputs/apk/release/app-release.apk
+
+          # Strict signature verification: ensure APK is signed and reject any unsigned artifact
+          echo "Verifying APK signature..."
+          if command -v apksigner >/dev/null 2>&1; then
+            apksigner verify --verbose app/build/outputs/apk/release/avanyx-store.apk || {
+              echo "ERROR: APK verification failed! The APK is not properly signed."
+              exit 1
+            }
+          elif command -v jarsigner >/dev/null 2>&1; then
+            jarsigner -verify -verbose -certs app/build/outputs/apk/release/avanyx-store.apk | grep "jar verified" || {
+              echo "ERROR: jarsigner verification failed! The APK is unsigned or has an invalid signature."
+              exit 1
+            }
+          else
+            # Unzip check: META-INF/*.RSA or *.EC or *.DSA must exist
+            unzip -l app/build/outputs/apk/release/avanyx-store.apk | grep -E "META-INF/.*\.(RSA|DSA|EC)" || {
+              echo "ERROR: Signature block not found in APK! The APK is unsigned."
+              exit 1
+            }
+          fi
+
+          echo "Verified signed release APK:"
+          ls -l app/build/outputs/apk/release/avanyx-store.apk
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-app-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          name: avanyx-store-apk
+          path: app/build/outputs/apk/release/avanyx-store.apk
           if-no-files-found: error
 
       - name: Upload Release AAB Artifact
