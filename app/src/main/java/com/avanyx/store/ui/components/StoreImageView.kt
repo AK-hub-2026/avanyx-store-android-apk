@@ -31,9 +31,20 @@ fun StoreImageView(
     val cleanUrl = remember(urlOrData) { urlOrData.trim() }
 
     val decodedBitmap = remember(cleanUrl) {
-        if (cleanUrl.isNotBlank() && (cleanUrl.startsWith("data:image") || cleanUrl.startsWith("data:application") || (cleanUrl.length > 300 && !cleanUrl.startsWith("http")))) {
+        if (cleanUrl.isNotBlank() && (cleanUrl.startsWith("data:image") || cleanUrl.startsWith("data:application") || (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://") && cleanUrl.length > 100))) {
             try {
-                val base64Data = if (cleanUrl.contains("base64,")) cleanUrl.substringAfter("base64,") else cleanUrl
+                var base64Data = if (cleanUrl.contains("base64,")) {
+                    cleanUrl.substringAfter("base64,")
+                } else {
+                    cleanUrl
+                }.trim().replace("\n", "").replace("\r", "").replace(" ", "")
+
+                // Fix missing padding if truncated
+                val missingPadding = (4 - (base64Data.length % 4)) % 4
+                if (missingPadding > 0) {
+                    base64Data += "=".repeat(missingPadding)
+                }
+
                 val decodedBytes = Base64.decode(base64Data, Base64.DEFAULT)
                 BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
             } catch (_: Throwable) {

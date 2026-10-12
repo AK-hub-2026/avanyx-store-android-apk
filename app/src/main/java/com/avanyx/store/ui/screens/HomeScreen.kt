@@ -325,33 +325,6 @@ fun HomeScreen(
             }
         }
 
-        // Market Headline & Subtitle matching web store
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "AVANYX Store: Android App Marketplace",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 19.sp,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                )
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = "AVANYX Store is an independent Android application marketplace and developer publishing platform providing direct APK downloads with zero telemetry and verified package integrity.",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                )
-            }
-        }
-
         // Horizontal Categories filter chips
         item {
             LazyRow(
@@ -384,8 +357,34 @@ fun HomeScreen(
         // Dynamic Special Banners (Developer Console / Admin promoted highlights from Firestore)
         item {
             val banners = remember(liveFeaturedBanners, allApps) {
-                if (liveFeaturedBanners.isNotEmpty()) {
-                    liveFeaturedBanners
+                val list = if (liveFeaturedBanners.isNotEmpty()) {
+                    liveFeaturedBanners.map { banner ->
+                        val matchingApp = allApps.find { it.id == banner.targetAppId || it.packageName == banner.targetAppId || it.name.equals(banner.title, ignoreCase = true) }
+                        val rawImg = banner.imageUrl.ifBlank { banner.bannerImageUrl }
+                        val resolvedImg = if (rawImg.isNotBlank() && !rawImg.startsWith("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAPoCAYAAABNo9Tk")) {
+                            rawImg
+                        } else if (matchingApp != null && matchingApp.bannerUrl.isNotBlank()) {
+                            matchingApp.bannerUrl
+                        } else if (rawImg.isNotBlank()) {
+                            rawImg
+                        } else {
+                            matchingApp?.iconUrl.orEmpty()
+                        }
+
+                        val resolvedTitle = if (banner.title.length <= 4 && matchingApp != null) matchingApp.name else banner.title
+                        val resolvedSubtitle = if (matchingApp != null && (banner.subtitle.contains("v1.0.0") || banner.subtitle.length < 15)) {
+                            "${matchingApp.developer} • ${matchingApp.shortDescription.ifBlank { matchingApp.category }}"
+                        } else {
+                            banner.subtitle
+                        }
+
+                        banner.copy(
+                            title = resolvedTitle,
+                            subtitle = resolvedSubtitle,
+                            imageUrl = resolvedImg,
+                            bannerImageUrl = resolvedImg
+                        )
+                    }
                 } else {
                     listOf(
                         com.avanyx.store.firebase.model.FirestoreFeaturedBanner(
@@ -399,21 +398,22 @@ fun HomeScreen(
                         ),
                         com.avanyx.store.firebase.model.FirestoreFeaturedBanner(
                             id = "promo_alok",
-                            title = "Alok Developer",
-                            subtitle = "AVANYX Store official production releases & verified security",
-                            badgeText = "FEATURED PUBLISHER",
+                            title = "AVANYX Store",
+                            subtitle = "Official high-performance app marketplace with verified security",
+                            badgeText = "FEATURED APP",
                             targetAppId = allApps.find { it.id.contains("avanyx", ignoreCase = true) }?.id ?: (allApps.firstOrNull()?.id ?: ""),
                             ctaText = "View App",
-                            imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80"
+                            imageUrl = allApps.find { it.id.contains("avanyx", ignoreCase = true) }?.bannerUrl ?: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80"
                         )
                     )
                 }
+                list
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp)
+                    .padding(vertical = 8.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -427,11 +427,11 @@ fun HomeScreen(
                             imageVector = Icons.Default.Campaign,
                             contentDescription = null,
                             tint = Color(0xFFFFB800),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Special Banners & Promotions",
+                            text = "Featured & Highlights",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                             color = MaterialTheme.colorScheme.onBackground
                         )
@@ -441,29 +441,31 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
                         Text(
-                            text = if (liveFeaturedBanners.isNotEmpty()) "Live Cloud" else "Featured",
+                            text = if (liveFeaturedBanners.isNotEmpty()) "Live" else "Featured",
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
 
                 androidx.compose.foundation.lazy.LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(banners) { banner ->
                         val targetApp = remember(banner.targetAppId, allApps) {
                             allApps.find { it.id == banner.targetAppId || it.packageName == banner.targetAppId }
                         }
+                        val bannerImg = banner.imageUrl.ifBlank { banner.bannerImageUrl }.ifBlank { targetApp?.bannerUrl.orEmpty() }
+
                         Card(
-                            shape = RoundedCornerShape(22.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
                             modifier = Modifier
-                                .width(280.dp)
-                                .height(175.dp)
+                                .width(310.dp)
+                                .height(190.dp)
                                 .clickable {
                                     if (banner.targetAppId.isNotBlank()) {
                                         onNavigateToDetails(banner.targetAppId)
@@ -475,7 +477,6 @@ fun HomeScreen(
                                 }
                         ) {
                             Box(modifier = Modifier.fillMaxSize()) {
-                                val bannerImg = banner.imageUrl.ifBlank { banner.bannerImageUrl }
                                 if (bannerImg.isNotBlank()) {
                                     com.avanyx.store.ui.components.StoreImageView(
                                         urlOrData = bannerImg,
@@ -489,21 +490,22 @@ fun HomeScreen(
                                             .fillMaxSize()
                                             .background(
                                                 androidx.compose.ui.graphics.Brush.linearGradient(
-                                                    colors = listOf(Color(0xFF31104B), Color(0xFF12131C))
+                                                    colors = listOf(Color(0xFF31104B), Color(0xFF1E1B4B), Color(0xFF0F172A))
                                                 )
                                             )
                                     )
                                 }
 
-                                // Dark Scrim Overlay
+                                // Dark Scrim Overlay for crystal-clear readability
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .background(
                                             androidx.compose.ui.graphics.Brush.verticalGradient(
                                                 colors = listOf(
-                                                    Color.Black.copy(alpha = 0.35f),
-                                                    Color.Black.copy(alpha = 0.88f)
+                                                    Color.Black.copy(alpha = 0.25f),
+                                                    Color.Black.copy(alpha = 0.6f),
+                                                    Color.Black.copy(alpha = 0.92f)
                                                 )
                                             )
                                         )
@@ -515,23 +517,55 @@ fun HomeScreen(
                                         .padding(14.dp),
                                     verticalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(100.dp),
-                                        color = Color.Black.copy(alpha = 0.65f),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = banner.badgeText.ifBlank { "FEATURED" }.uppercase(),
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.sp),
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(100.dp),
+                                            color = Color.Black.copy(alpha = 0.7f),
+                                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f))
+                                        ) {
+                                            Text(
+                                                text = banner.badgeText.ifBlank { "FEATURED" }.uppercase(),
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 9.sp),
+                                                color = Color(0xFFFFD700),
+                                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                                            )
+                                        }
+
+                                        if (targetApp != null) {
+                                            Surface(
+                                                shape = RoundedCornerShape(100.dp),
+                                                color = Color.Black.copy(alpha = 0.65f),
+                                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f))
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFFFFB800),
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(3.dp))
+                                                    Text(
+                                                        text = "${targetApp.rating}",
+                                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                                        color = Color.White
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
 
                                     Column {
                                         Text(
                                             text = banner.title,
-                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = 17.sp),
                                             color = Color.White,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -539,23 +573,29 @@ fun HomeScreen(
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = banner.subtitle,
-                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp),
-                                            color = Color.White.copy(alpha = 0.85f),
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp, lineHeight = 15.sp),
+                                            color = Color.White.copy(alpha = 0.9f),
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Spacer(modifier = Modifier.height(6.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(Color.White.copy(alpha = 0.15f))
+                                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
                                             Text(
                                                 text = banner.ctaText.ifBlank { "View App" },
-                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
-                                                color = Color(0xFFA78BFA)
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold, fontSize = 11.sp),
+                                                color = Color.White
                                             )
-                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Default.ArrowForward,
                                                 contentDescription = null,
-                                                tint = Color(0xFFA78BFA),
+                                                tint = Color.White,
                                                 modifier = Modifier.size(12.dp)
                                             )
                                         }
@@ -630,9 +670,10 @@ fun HomeScreen(
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             // Feature Graphic Image
-                            if (spotlightApp.bannerUrl.isNotBlank()) {
+                            val spotlightImg = spotlightApp.bannerUrl.ifBlank { spotlightApp.screenshots.firstOrNull().orEmpty() }
+                            if (spotlightImg.isNotBlank()) {
                                 com.avanyx.store.ui.components.StoreImageView(
-                                    urlOrData = spotlightApp.bannerUrl,
+                                    urlOrData = spotlightImg,
                                     contentDescription = "${spotlightApp.name} Spotlight Banner",
                                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
